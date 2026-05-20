@@ -201,11 +201,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnOptimize.addEventListener('click', async () => {
         const thFixed = document.getElementById('townhall-fixed').checked;
+        const optTime = parseFloat(document.getElementById('opt-time').value) || 10;
         const payload = {
             grid: { width: gridW, height: gridH, valid_tiles: validTiles },
             buildings: buildings,
             townhall_fixed: thFixed,
-            townhall_pos: null
+            townhall_pos: null,
+            optimization_time: optTime
         };
         
         btnOptimize.textContent = "Solving...";
