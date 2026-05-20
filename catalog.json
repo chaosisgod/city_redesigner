@@ -1,0 +1,272 @@
+[
+    {
+        "name": "Townhall",
+        "width": 7,
+        "height": 6,
+        "road_type": 0
+    },
+    {
+        "name": "Residential",
+        "width": 2,
+        "height": 2,
+        "road_type": 1
+    },
+    {
+        "name": "Production",
+        "width": 3,
+        "height": 3,
+        "road_type": 1
+    },
+    {
+        "name": "Goods",
+        "width": 4,
+        "height": 3,
+        "road_type": 2
+    },
+    {
+        "name": "Decoration",
+        "width": 1,
+        "height": 1,
+        "road_type": 0
+    },
+    {
+        "name": "huginn tale hut lv2",
+        "width": 4,
+        "height": 4,
+        "road_type": 1
+    },
+    {
+        "name": "fjordstorm harbor",
+        "width": 7,
+        "height": 4,
+        "road_type": 1
+    },
+    {
+        "name": "neo solara emporium",
+        "width": 5,
+        "height": 4,
+        "road_type": 0
+    },
+    {
+        "name": "eternal market - tuscan horizon",
+        "width": 6,
+        "height": 6,
+        "road_type": 0
+    },
+    {
+        "name": "forgotten temple",
+        "width": 3,
+        "height": 4,
+        "road_type": 0
+    },
+    {
+        "name": "neo lunara bazaar",
+        "width": 5,
+        "height": 4,
+        "road_type": 1
+    },
+    {
+        "name": "neo fashion boutique",
+        "width": 2,
+        "height": 2,
+        "road_type": 0
+    },
+    {
+        "name": "shinto temple lv4",
+        "width": 3,
+        "height": 4,
+        "road_type": 0
+    },
+    {
+        "name": "neo clocktower lv2",
+        "width": 2,
+        "height": 3,
+        "road_type": 0
+    },
+    {
+        "name": "neo ziggurat lv2",
+        "width": 3,
+        "height": 3,
+        "road_type": 0
+    },
+    {
+        "name": "neo tree of love lv2",
+        "width": 3,
+        "height": 3,
+        "road_type": 0
+    },
+    {
+        "name": "neo menagerie lv2",
+        "width": 3,
+        "height": 4,
+        "road_type": 0
+    },
+    {
+        "name": "warforge trench lv2",
+        "width": 3,
+        "height": 1,
+        "road_type": 0
+    },
+    {
+        "name": "rogue den",
+        "width": 2,
+        "height": 2,
+        "road_type": 1
+    },
+    {
+        "name": "neo aviary lv2",
+        "width": 2,
+        "height": 4,
+        "road_type": 0
+    },
+    {
+        "name": "neo checkmate square lv2",
+        "width": 3,
+        "height": 3,
+        "road_type": 0
+    },
+    {
+        "name": "neo lunara emporium",
+        "width": 5,
+        "height": 4,
+        "road_type": 0
+    },
+    {
+        "name": "villa",
+        "width": 2,
+        "height": 2,
+        "road_type": 1
+    },
+    {
+        "name": "jewelry manufacturer",
+        "width": 3,
+        "height": 4,
+        "road_type": 1
+    },
+    {
+        "name": "weaving mill",
+        "width": 4,
+        "height": 3,
+        "road_type": 1
+    },
+    {
+        "name": "cottage",
+        "width": 2,
+        "height": 2,
+        "road_type": 1
+    },
+    {
+        "name": "grand queen lv2",
+        "width": 3,
+        "height": 3,
+        "road_type": 1
+    },
+    {
+        "name": "grand king lv2",
+        "width": 3,
+        "height": 3,
+        "road_type": 1
+    },
+    {
+        "name": "timeless junction",
+        "width": 2,
+        "height": 2,
+        "road_type": 0
+    },
+    {
+        "name": "stone mason",
+        "width": 4,
+        "height": 4,
+        "road_type": 1
+    },
+    {
+        "name": "lumbermill",
+        "width": 3,
+        "height": 3,
+        "road_type": 1
+    },
+    {
+        "name": "trading post lv8",
+        "width": 4,
+        "height": 5,
+        "road_type": 1
+    },
+    {
+        "name": "longhouse",
+        "width": 4,
+        "height": 2,
+        "road_type": 1
+    },
+    {
+        "name": "aqueduct",
+        "width": 3,
+        "height": 1,
+        "road_type": 0
+    },
+    {
+        "name": "alcatraz",
+        "width": 10,
+        "height": 7,
+        "road_type": 1
+    },
+    {
+        "name": "seed vault",
+        "width": 5,
+        "height": 6,
+        "road_type": 1
+    },
+    {
+        "name": "cosmic catalyst",
+        "width": 4,
+        "height": 4,
+        "road_type": 1
+    },
+    {
+        "name": "temple of relics",
+        "width": 6,
+        "height": 6,
+        "road_type": 1
+    },
+    {
+        "name": "observatory",
+        "width": 3,
+        "height": 3,
+        "road_type": 1
+    },
+    {
+        "name": "the arc",
+        "width": 7,
+        "height": 5,
+        "road_type": 1
+    },
+    {
+        "name": "statue of zeus",
+        "width": 2,
+        "height": 3,
+        "road_type": 1
+    },
+    {
+        "name": "oracle of delphi",
+        "width": 3,
+        "height": 3,
+        "road_type": 1
+    },
+    {
+        "name": "road",
+        "width": 1,
+        "height": 1,
+        "road_type": 0
+    },
+    {
+        "name": "levitation outlet",
+        "width": 3,
+        "height": 4,
+        "road_type": 2
+    },
+    {
+        "name": "njord's fjordstorm harbor",
+        "width": 7,
+        "height": 4,
+        "road_type": 0
+    }
+]

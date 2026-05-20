@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FoE City Redesigner</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="header">
+                <h1>City Redesigner</h1>
+                <p>Forge of Empires Layout Optimizer</p>
+            </div>
+            
+            <div class="panel map-controls">
+                <h2>Map Controls</h2>
+                <div class="control-group">
+                    <label>Grid Size</label>
+                    <div class="inputs">
+                        <input type="number" id="grid-width" value="20" min="5" max="100">
+                        <span>×</span>
+                        <input type="number" id="grid-height" value="20" min="5" max="100">
+                    </div>
+                    <button id="btn-resize" class="btn secondary">Apply Size</button>
+                </div>
+                <div class="mode-toggle">
+                    <button id="btn-mode-paint" class="btn active">Paint Map</button>
+                    <button id="btn-mode-erase" class="btn">Erase Map</button>
+                </div>
+            </div>
+
+            <div class="panel solver-controls">
+                <h2>Solver Options</h2>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="townhall-fixed" checked>
+                    Townhall Position Fixed
+                </label>
+                <button id="btn-optimize" class="btn primary">Optimize Layout</button>
+            </div>
+            
+            <div class="panel debug-panel">
+                <h2>Debug Output</h2>
+                <div id="solver-summary-stats" style="margin-bottom: 8px; font-size: 11px; line-height: 1.4; color: #38bdf8; font-family: sans-serif;"></div>
+                <textarea id="debug-output" readonly style="width: 100%; height: 100px; font-family: monospace; font-size: 10px; background: #0f172a; color: #cbd5e1; border: 1px solid #334155; border-radius: 4px; padding: 5px;"></textarea>
+            </div>
+
+            <div class="panel buildings-panel">
+                <h2>Buildings</h2>
+                <form id="add-building-form">
+                    <input type="text" id="b-name" list="catalog-list" placeholder="Name" required autocomplete="off">
+                    <datalist id="catalog-list"></datalist>
+                    <div class="inputs">
+                        <input type="number" id="b-w" placeholder="W" min="1" required>
+                        <input type="number" id="b-h" placeholder="H" min="1" required>
+                    </div>
+                    <select id="b-road">
+                        <option value="0">No Road</option>
+                        <option value="1">1x1 Road</option>
+                        <option value="2">2x2 Road</option>
+                    </select>
+                    <div class="inputs" style="margin-top:5px;">
+                        <input type="number" id="b-qty" placeholder="Qty" value="1" min="1" required>
+                        <button type="submit" class="btn add-btn">+ Add</button>
+                    </div>
+                </form>
+                <ul id="buildings-list"></ul>
+            </div>
+        </aside>
+
+        <main class="canvas-container">
+            <div id="city-grid" class="grid"></div>
+        </main>
+    </div>
+    
+    <div id="tooltip" style="position: absolute; display: none; background: rgba(0,0,0,0.8); color: white; padding: 5px 10px; border-radius: 4px; pointer-events: none; z-index: 1000; font-size: 0.9rem; white-space: nowrap;"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
