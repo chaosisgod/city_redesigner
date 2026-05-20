@@ -30,6 +30,45 @@ document.addEventListener('DOMContentLoaded', () => {
     let buildingIdCounter = 1;
     let catalog = [];
 
+    const rootSelect = document.getElementById('root-select');
+    const embassySizeContainer = document.getElementById('embassy-size-container');
+    const embassyWInput = document.getElementById('embassy-w');
+    const embassyHInput = document.getElementById('embassy-h');
+
+    function updateRootBuilding() {
+        const rootType = rootSelect.value;
+        if (rootType === 'townhall') {
+            embassySizeContainer.style.display = 'none';
+            buildings[0] = {
+                id: 'b_0',
+                name: 'Townhall',
+                width: 7,
+                height: 6,
+                road_type: 0,
+                color: '#eab308'
+            };
+        } else {
+            embassySizeContainer.style.display = 'flex';
+            const w = parseInt(embassyWInput.value) || 4;
+            const h = parseInt(embassyHInput.value) || 4;
+            buildings[0] = {
+                id: 'b_0',
+                name: 'Embassy',
+                width: w,
+                height: h,
+                road_type: 0,
+                color: '#10b981'
+            };
+        }
+        renderBuildings();
+    }
+
+    if (rootSelect) {
+        rootSelect.addEventListener('change', updateRootBuilding);
+        embassyWInput.addEventListener('input', updateRootBuilding);
+        embassyHInput.addEventListener('input', updateRootBuilding);
+    }
+
     async function fetchCatalog() {
         try {
             const res = await fetch('/api/catalog');
@@ -122,9 +161,10 @@ document.addEventListener('DOMContentLoaded', () => {
     addBuildingForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = document.getElementById('b-name').value;
+        const lowerName = name.toLowerCase();
 
-        if (name.toLowerCase().includes('townhall') && buildings.some(b => b.name.toLowerCase().includes('townhall'))) {
-            alert("Only one Townhall is allowed!");
+        if (lowerName.includes('townhall') || lowerName.includes('embassy')) {
+            alert("The connection hub (Townhall or Embassy) is managed via the 'Root Hub' panel above!");
             return;
         }
 
@@ -172,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
             li.style.borderLeft = `4px solid ${g.b.color}`;
             li.innerHTML = `
                 <span>${g.count}x ${g.b.name} (${g.b.width}x${g.b.height})</span>
-                ${g.b.name.toLowerCase().includes('townhall') ? '' : `<button onclick="removeBuildingGroup('${g.b.name}')">X</button>`}
+                ${(g.b.name.toLowerCase().includes('townhall') || g.b.name.toLowerCase().includes('embassy')) ? '' : `<button onclick="removeBuildingGroup('${g.b.name}')">X</button>`}
             `;
             
             li.addEventListener('mouseenter', () => {
@@ -302,7 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const b = buildings.find(x => x.id === pb.building_id);
             if(!b) return;
             // if it's townhall, color differently
-            const isTH = b.name.toLowerCase().includes('townhall');
+            const isTH = b.name.toLowerCase().includes('townhall') || b.name.toLowerCase().includes('embassy');
             for(let dy=0; dy<b.height; dy++) {
                 for(let dx=0; dx<b.width; dx++) {
                     const idx = (pb.y + dy) * gridW + (pb.x + dx);

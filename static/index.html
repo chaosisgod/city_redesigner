@@ -50,6 +50,25 @@
                 <textarea id="debug-output" readonly style="width: 100%; height: 100px; font-family: monospace; font-size: 10px; background: #0f172a; color: #cbd5e1; border: 1px solid #334155; border-radius: 4px; padding: 5px;"></textarea>
             </div>
 
+            <div class="panel root-building-panel">
+                <h2>Root Hub</h2>
+                <div class="inputs" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                    <label for="root-select" style="font-size: 0.8rem; color: var(--text-muted);">Type</label>
+                    <select id="root-select" style="width: 100%;">
+                        <option value="townhall">Townhall (7×6)</option>
+                        <option value="embassy">Embassy (Custom Size)</option>
+                    </select>
+                </div>
+                <div id="embassy-size-container" style="display: none; flex-direction: column; gap: 4px; width: 100%;">
+                    <label style="font-size: 0.8rem; color: var(--text-muted);">Embassy Size</label>
+                    <div class="inputs">
+                        <input type="number" id="embassy-w" value="4" min="1" required>
+                        <span>×</span>
+                        <input type="number" id="embassy-h" value="4" min="1" required>
+                    </div>
+                </div>
+            </div>
+
             <div class="panel buildings-panel">
                 <h2>Buildings</h2>
                 <form id="add-building-form">

@@ -18,7 +18,7 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
     valid_tiles = request.grid.valid_tiles
     
     buildings_orig = request.buildings.copy()
-    th_building = next((b for b in buildings_orig if b.name.lower().startswith('townhall')), None)
+    th_building = next((b for b in buildings_orig if b.name.lower().startswith('townhall') or b.name.lower().startswith('embassy')), None)
     if th_building:
         buildings_orig.remove(th_building)
         
