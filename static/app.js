@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             li.addEventListener('mouseenter', () => {
                 gridEl.classList.add('highlighting');
                 Array.from(gridEl.children).forEach(tile => {
-                    if (tile.style.backgroundColor === g.b.color || (g.b.name.toLowerCase().includes('townhall') && tile.classList.contains('th'))) {
+                    if (tile.dataset.name && tile.dataset.name.toLowerCase() === g.b.name.toLowerCase()) {
                         tile.classList.add('highlight');
                     }
                 });
