@@ -222,9 +222,10 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
     model.Maximize(sum(objective_terms))
 
     # 6. Solve
+    import os
     solver = cp_model.CpSolver()
-    # Set solve timeout
     solver.parameters.max_time_in_seconds = request.optimization_time or 10.0
+    solver.parameters.num_search_workers = max(1, os.cpu_count() or 4)
     status = solver.Solve(model)
 
     # Parse results

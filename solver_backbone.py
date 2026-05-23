@@ -1,8 +1,11 @@
 from models import SolveRequest, SolveResponse, PlacedBuilding, PlacedRoad
 import random
+import os
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
-def solve_layout(request: SolveRequest) -> SolveResponse:
-    random.seed(random.randint(0, 1000000))
+def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
+    random.seed(seed)
     
     grid_w = request.grid.width
     grid_h = request.grid.height
@@ -16,13 +19,12 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
         
     other_buildings = [b for b in buildings if b.id != hub.id]
     
-    # Global state helper
     def is_tile_valid(x, y):
         if x < 0 or y < 0 or x >= grid_w or y >= grid_h:
             return False
         return valid_tiles[y][x]
 
-    # Helper: Place hub at center (or fixed position)
+    # Hub placement
     hub_w, hub_h = hub.width, hub.height
     if request.townhall_fixed and request.townhall_pos:
         hub_x, hub_y = request.townhall_pos
@@ -30,11 +32,9 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
         hub_x = max(0, (grid_w - hub_w) // 2)
         hub_y = max(0, (grid_h - hub_h) // 2)
 
-    # Let's verify hub fits
     for dy in range(hub_h):
         for dx in range(hub_w):
             if not is_tile_valid(hub_x + dx, hub_y + dy):
-                # Search for a nearby valid fit
                 found = False
                 for dist in range(1, max(grid_w, grid_h)):
                     for sy in range(-dist, dist + 1):
@@ -57,26 +57,21 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
 
     hub_tiles = set((hub_x + dx, hub_y + dy) for dy in range(hub_h) for dx in range(hub_w))
 
-    # Initialize roads and occupied grids
     roads = [[0 for _ in range(grid_w)] for _ in range(grid_h)]
     occupied = [[not valid_tiles[y][x] for x in range(grid_w)] for y in range(grid_h)]
 
-    # Mark hub
     for tx, ty in hub_tiles:
         if 0 <= tx < grid_w and 0 <= ty < grid_h:
             occupied[ty][tx] = True
             roads[ty][tx] = 3
 
-    # Generate backbone roads
     backbone = request.backbone_type or "center_spine"
     
-    # Determine the maximum road requirement type (to decide 1x1 or 2x2 roads)
     max_road_req = 1
     if any(b.road_type == 2 for b in other_buildings):
         max_road_req = 2
         
     if backbone == "center_spine":
-        # Draw a horizontal spine in the center
         spine_y = grid_h // 2
         for x in range(grid_w):
             if is_tile_valid(x, spine_y):
@@ -86,7 +81,6 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                     roads[spine_y + 1][x] = max(roads[spine_y + 1][x], 2)
                     occupied[spine_y + 1][x] = True
                     
-        # Connect Hub to spine with a vertical road
         min_y = min(hub_y, spine_y)
         max_y = max(hub_y + hub_h - 1, spine_y)
         conn_x = hub_x + hub_w // 2
@@ -96,7 +90,6 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                 occupied[y][conn_x] = True
 
     elif backbone == "grid":
-        # Draw horizontal lanes every 5 tiles
         lanes = [y for y in range(2, grid_h, 5)]
         for lane_y in lanes:
             for x in range(grid_w):
@@ -107,7 +100,6 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                         roads[lane_y + 1][x] = max(roads[lane_y + 1][x], 2)
                         occupied[lane_y + 1][x] = True
                         
-        # Draw a vertical spine to link all lanes
         conn_x = hub_x + hub_w // 2
         for y in range(grid_h):
             if is_tile_valid(conn_x, y):
@@ -115,11 +107,9 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                 occupied[y][conn_x] = True
 
     elif backbone == "perimeter":
-        # Draw perimeter loop around valid outer grid cells
         for y in range(grid_h):
             for x in range(grid_w):
                 if is_tile_valid(x, y):
-                    # Check if it is a border cell of the valid area
                     is_border = False
                     for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                         if not is_tile_valid(x + dx, y + dy):
@@ -129,7 +119,6 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                         roads[y][x] = max(roads[y][x], max_road_req)
                         occupied[y][x] = True
                         
-        # Ensure Hub is connected
         conn_x = hub_x + hub_w // 2
         for y in range(grid_h):
             if is_tile_valid(conn_x, y):
@@ -137,7 +126,6 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                 occupied[y][conn_x] = True
 
     elif backbone == "custom" and request.custom_roads:
-        # Load user-painted roads
         for pr in request.custom_roads:
             if pr.type == 2:
                 for dy in range(2):
@@ -151,11 +139,21 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                     roads[pr.y][pr.x] = max(roads[pr.y][pr.x], 1)
                     occupied[pr.y][pr.x] = True
 
-    # Pack other buildings flush against the road network
     placed_buildings = [PlacedBuilding(building_id=hub.id, x=hub_x, y=hub_y)]
     
-    # Sort inventory by size descending
-    sorted_b = sorted(other_buildings, key=lambda x: x.width * x.height, reverse=True)
+    # Shuffle within same sizes to explore diverse packings
+    by_size = {}
+    for b in other_buildings:
+        size = b.width * b.height
+        if size not in by_size:
+            by_size[size] = []
+        by_size[size].append(b)
+        
+    sorted_b = []
+    for size in sorted(by_size.keys(), reverse=True):
+        lst = by_size[size]
+        random.shuffle(lst)
+        sorted_b.extend(lst)
     
     def is_adjacent_to_road(cx, cy, cw, ch, req_road_type):
         if req_road_type == 0:
@@ -179,7 +177,6 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
 
     for b in sorted_b:
         best_x, best_y = -1, -1
-        # Greedy search for a placement touching the road
         found = False
         for y in range(grid_h):
             for x in range(grid_w):
@@ -191,17 +188,13 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
             if found: break
             
         if found:
-            # Place it!
             for dy in range(b.height):
                 for dx in range(b.width):
                     occupied[best_y+dy][best_x+dx] = True
             placed_buildings.append(PlacedBuilding(building_id=b.id, x=best_x, y=best_y))
 
     # Post-Placement BFS Road Pruning
-    # Prune any road tile that is NOT connected or adjacent to a placed building!
     keep_tiles = set()
-    
-    # Run BFS from the connection hub tiles to find all reachable road cells
     queue = []
     visited = {}
     for th_tx, th_ty in hub_tiles:
@@ -223,7 +216,6 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                     visited[(nx, ny)] = (cx, cy)
                     queue.append((nx, ny))
 
-    # For each placed building requiring roads, find adjacent reachable road tiles
     building_road_types = {b.id: b.road_type for b in buildings}
     for pb in placed_buildings:
         if pb.building_id == hub.id: continue
@@ -234,27 +226,23 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
         w, h = b.width, b.height
         
         connected_tiles = []
-        # Check top/bottom boundaries
         for dx in range(w):
             if pb.y - 1 >= 0 and roads[pb.y - 1][pb.x + dx] >= req_type and (pb.x + dx, pb.y - 1) in visited:
                 connected_tiles.append((pb.x + dx, pb.y - 1))
             if pb.y + h < grid_h and roads[pb.y + h][pb.x + dx] >= req_type and (pb.x + dx, pb.y + h) in visited:
                 connected_tiles.append((pb.x + dx, pb.y + h))
-        # Check left/right boundaries
         for dy in range(h):
             if pb.x - 1 >= 0 and roads[pb.y + dy][pb.x - 1] >= req_type and (pb.x - 1, pb.y + dy) in visited:
                 connected_tiles.append((pb.x - 1, pb.y + dy))
             if pb.x + w < grid_w and roads[pb.y + dy][pb.x + w] >= req_type and (pb.x + w, pb.y + dy) in visited:
                 connected_tiles.append((pb.x + w, pb.y + dy))
                 
-        # Trace path back to Hub
         for start_tile in connected_tiles:
             curr = start_tile
             while curr is not None:
                 keep_tiles.add(curr)
                 curr = visited[curr]
 
-    # Rebuild placed roads using only keep_tiles
     placed_roads = []
     road_tiles_used = set()
     for y in range(grid_h):
@@ -269,7 +257,6 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                     placed_roads.append(PlacedRoad(x=x, y=y, type=1))
                     road_tiles_used.add((x, y))
 
-    # Calculate final score
     num_placed = len(placed_buildings)
     road_cost = sum(1 for pr in placed_roads for dy in range(pr.type) for dx in range(pr.type))
     score = num_placed * 10000 - road_cost
@@ -284,3 +271,31 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
         num_1x1_roads=num_1x1,
         num_2x2_roads=num_2x2
     )
+
+def solve_layout(request: SolveRequest) -> SolveResponse:
+    num_workers = max(1, (os.cpu_count() or 4) - 1)
+    
+    # Since backbone packing is incredibly fast, we can run multiple randomized seeds in parallel
+    # to evaluate diverse strip-packing arrangements, taking the best result.
+    if num_workers <= 1 or request.debug:
+        return solve_single_worker(request, random.randint(0, 1000000))
+        
+    best_response = None
+    best_score = -float('inf')
+    
+    seeds = [random.randint(0, 1000000) for _ in range(num_workers * 4)] # Run 4x seeds for rich diversity
+    
+    ctx = multiprocessing.get_context('spawn')
+    
+    with ProcessPoolExecutor(max_workers=num_workers, mp_context=ctx) as executor:
+        futures = [executor.submit(solve_single_worker, request, seed) for seed in seeds]
+        for future in as_completed(futures):
+            try:
+                res = future.result()
+                if res and res.score > best_score:
+                    best_score = res.score
+                    best_response = res
+            except Exception as e:
+                print(f"Backbone worker process failed: {e}")
+                
+    return best_response
