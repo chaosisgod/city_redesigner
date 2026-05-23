@@ -20,14 +20,6 @@ class CityGrid(BaseModel):
     height: int
     valid_tiles: List[List[bool]]
 
-class SolveRequest(BaseModel):
-    grid: CityGrid
-    buildings: List[Building]
-    townhall_fixed: bool
-    townhall_pos: Optional[Tuple[int, int]] = None
-    optimization_time: float = 60.0
-    debug: bool = False
-
 class PlacedBuilding(BaseModel):
     building_id: str
     x: int
@@ -37,6 +29,18 @@ class PlacedRoad(BaseModel):
     x: int
     y: int
     type: int
+
+class SolveRequest(BaseModel):
+    grid: CityGrid
+    buildings: List[Building]
+    townhall_fixed: bool
+    townhall_pos: Optional[Tuple[int, int]] = None
+    optimization_time: float = 60.0
+    debug: bool = False
+    solver_type: str = "random_greedy"  # random_greedy, simulated_annealing, backbone, constraint_programming
+    backbone_type: Optional[str] = "center_spine"  # center_spine, grid, perimeter, custom
+    annealing_iterations: int = 1500
+    custom_roads: Optional[List[PlacedRoad]] = None
 
 class SolveResponse(BaseModel):
     placed_buildings: List[PlacedBuilding]

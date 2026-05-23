@@ -33,13 +33,42 @@
 
             <div class="panel solver-controls">
                 <h2>Solver Options</h2>
+                
                 <div class="inputs" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                    <label for="solver-select" style="font-size: 0.8rem; color: var(--text-muted);">Solver Algorithm</label>
+                    <select id="solver-select" style="width: 100%;">
+                        <option value="random_greedy">Random-Restart Greedy (Fast)</option>
+                        <option value="simulated_annealing">Simulated Annealing (Incremental)</option>
+                        <option value="backbone">Structured Road Backbone</option>
+                        <option value="constraint_programming">CP-SAT Math Solver (OR-Tools)</option>
+                    </select>
+                </div>
+
+                <!-- Backbone Parameters -->
+                <div id="backbone-params" style="display: none; flex-direction: column; gap: 4px; width: 100%;">
+                    <label for="backbone-select" style="font-size: 0.8rem; color: var(--text-muted);">Road Backbone Style</label>
+                    <select id="backbone-select" style="width: 100%;">
+                        <option value="center_spine">Center Spine</option>
+                        <option value="grid">Grid Tracks (Every 5 tiles)</option>
+                        <option value="perimeter">Perimeter Loop</option>
+                        <option value="custom">Use Painted Roads (Custom)</option>
+                    </select>
+                </div>
+
+                <!-- Simulated Annealing Parameters -->
+                <div id="annealing-params" style="display: none; flex-direction: column; gap: 4px; width: 100%;">
+                    <label for="annealing-iter" style="font-size: 0.8rem; color: var(--text-muted);">Search Iterations</label>
+                    <input type="number" id="annealing-iter" value="1500" min="100" max="10000" step="100" required>
+                </div>
+
+                <div class="inputs" style="flex-direction: column; align-items: flex-start; gap: 4px; width: 100%;">
                     <label for="opt-time" style="font-size: 0.8rem; color: var(--text-muted);">Optimization Time (seconds)</label>
                     <input type="number" id="opt-time" value="10" min="1" max="300" required>
                 </div>
+
                 <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 0.9rem; color: #cbd5e1; cursor: pointer;">
                     <input type="checkbox" id="townhall-fixed" checked style="width: auto; cursor: pointer;">
-                    Townhall Position Fixed
+                    Root Hub Position Fixed
                 </label>
                 <button id="btn-optimize" class="btn primary">Optimize Layout</button>
             </div>

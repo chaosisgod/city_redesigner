@@ -11,13 +11,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const addBuildingForm = document.getElementById('add-building-form');
     const buildingsList = document.getElementById('buildings-list');
     
-    let gridW = parseInt(widthInput.value);
-    let gridH = parseInt(heightInput.value);
+    // Declare new solver UI elements
+    const solverSelect = document.getElementById('solver-select');
+    const backboneParams = document.getElementById('backbone-params');
+    const backboneSelect = document.getElementById('backbone-select');
+    const annealingParams = document.getElementById('annealing-params');
+    const annealingIterInput = document.getElementById('annealing-iter');
+    const optTimeInput = document.getElementById('opt-time');
+    const townhallFixedCheckbox = document.getElementById('townhall-fixed');
+
+    // Restore grid dimensions from localStorage
+    const savedGridW = localStorage.getItem('foe_city_grid_w');
+    const savedGridH = localStorage.getItem('foe_city_grid_h');
+    let gridW = savedGridW ? parseInt(savedGridW) : parseInt(widthInput.value);
+    let gridH = savedGridH ? parseInt(savedGridH) : parseInt(heightInput.value);
+    widthInput.value = gridW;
+    heightInput.value = gridH;
+
     let validTiles = [];
     let isPainting = false;
     let paintMode = true; // true = paint valid, false = erase
     
-    let buildings = [
+    // Restore buildings inventory from localStorage
+    const savedBuildings = localStorage.getItem('foe_city_buildings');
+    let buildings = savedBuildings ? JSON.parse(savedBuildings) : [
         {
             id: 'b_0',
             name: 'Townhall',
@@ -27,13 +44,92 @@ document.addEventListener('DOMContentLoaded', () => {
             color: '#eab308'
         }
     ];
-    let buildingIdCounter = 1;
+    
+    const savedCounter = localStorage.getItem('foe_city_building_counter');
+    let buildingIdCounter = savedCounter ? parseInt(savedCounter) : 1;
     let catalog = [];
 
     const rootSelect = document.getElementById('root-select');
     const embassySizeContainer = document.getElementById('embassy-size-container');
     const embassyWInput = document.getElementById('embassy-w');
     const embassyHInput = document.getElementById('embassy-h');
+
+    // Restore root hub configuration
+    const savedRootType = localStorage.getItem('foe_city_root_type') || 'townhall';
+    const savedEmbassyW = localStorage.getItem('foe_city_embassy_w') || '4';
+    const savedEmbassyH = localStorage.getItem('foe_city_embassy_h') || '4';
+    if (rootSelect) {
+        rootSelect.value = savedRootType;
+        embassyWInput.value = savedEmbassyW;
+        embassyHInput.value = savedEmbassyH;
+        embassySizeContainer.style.display = savedRootType === 'townhall' ? 'none' : 'flex';
+    }
+
+    // Restore solver selections
+    if (solverSelect) {
+        solverSelect.value = localStorage.getItem('foe_city_solver_type') || 'random_greedy';
+        backboneSelect.value = localStorage.getItem('foe_city_backbone_type') || 'center_spine';
+        annealingIterInput.value = localStorage.getItem('foe_city_annealing_iter') || '1500';
+        optTimeInput.value = localStorage.getItem('foe_city_opt_time') || '10';
+        const savedFixed = localStorage.getItem('foe_city_townhall_fixed');
+        if (savedFixed !== null) {
+            townhallFixedCheckbox.checked = savedFixed === 'true';
+        }
+    }
+
+    function saveToLocalStorage() {
+        localStorage.setItem('foe_city_grid_w', gridW);
+        localStorage.setItem('foe_city_grid_h', gridH);
+        localStorage.setItem('foe_city_buildings', JSON.stringify(buildings));
+        localStorage.setItem('foe_city_building_counter', buildingIdCounter);
+        localStorage.setItem('foe_city_valid_tiles', JSON.stringify(validTiles));
+        
+        if (rootSelect) {
+            localStorage.setItem('foe_city_root_type', rootSelect.value);
+            localStorage.setItem('foe_city_embassy_w', embassyWInput.value);
+            localStorage.setItem('foe_city_embassy_h', embassyHInput.value);
+        }
+        
+        if (solverSelect) {
+            localStorage.setItem('foe_city_solver_type', solverSelect.value);
+            localStorage.setItem('foe_city_backbone_type', backboneSelect.value);
+            localStorage.setItem('foe_city_annealing_iter', annealingIterInput.value);
+            localStorage.setItem('foe_city_opt_time', optTimeInput.value);
+            localStorage.setItem('foe_city_townhall_fixed', townhallFixedCheckbox.checked);
+        }
+    }
+
+    function updateSolverParamsVisibility() {
+        const solver = solverSelect.value;
+        backboneParams.style.display = (solver === 'backbone' || solver === 'constraint_programming') ? 'flex' : 'none';
+        annealingParams.style.display = solver === 'simulated_annealing' ? 'flex' : 'none';
+        
+        // Custom labels for custom backbone painted roads
+        if ((solver === 'backbone' || solver === 'constraint_programming') && backboneSelect.value === 'custom') {
+            btnPaint.textContent = "Paint Custom Roads";
+            btnErase.textContent = "Erase Roads";
+        } else {
+            btnPaint.textContent = "Paint Map";
+            btnErase.textContent = "Erase Map";
+        }
+    }
+
+    if (solverSelect) {
+        solverSelect.addEventListener('change', () => {
+            updateSolverParamsVisibility();
+            saveToLocalStorage();
+        });
+        backboneSelect.addEventListener('change', () => {
+            updateSolverParamsVisibility();
+            saveToLocalStorage();
+        });
+        annealingIterInput.addEventListener('input', saveToLocalStorage);
+        optTimeInput.addEventListener('input', saveToLocalStorage);
+        townhallFixedCheckbox.addEventListener('change', saveToLocalStorage);
+        
+        // Initial trigger
+        updateSolverParamsVisibility();
+    }
 
     function updateRootBuilding() {
         const rootType = rootSelect.value;
@@ -61,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
         renderBuildings();
+        saveToLocalStorage();
     }
 
     if (rootSelect) {
@@ -105,12 +202,29 @@ document.addEventListener('DOMContentLoaded', () => {
     function initGrid() {
         gridEl.style.gridTemplateColumns = `repeat(${gridW}, 24px)`;
         gridEl.innerHTML = '';
-        validTiles = Array(gridH).fill().map(() => Array(gridW).fill(true)); // default all valid
+        
+        // Restore painted map layout if dimensions match
+        let savedTiles = localStorage.getItem('foe_city_valid_tiles');
+        if (savedTiles) {
+            try {
+                let parsed = JSON.parse(savedTiles);
+                if (parsed.length === gridH && parsed[0].length === gridW) {
+                    validTiles = parsed;
+                } else {
+                    validTiles = Array(gridH).fill().map(() => Array(gridW).fill(true));
+                }
+            } catch (e) {
+                validTiles = Array(gridH).fill().map(() => Array(gridW).fill(true));
+            }
+        } else {
+            validTiles = Array(gridH).fill().map(() => Array(gridW).fill(true));
+        }
         
         for (let y = 0; y < gridH; y++) {
             for (let x = 0; x < gridW; x++) {
                 const tile = document.createElement('div');
-                tile.className = 'tile valid';
+                const isValid = validTiles[y][x];
+                tile.className = isValid ? 'tile valid' : 'tile empty';
                 tile.dataset.x = x;
                 tile.dataset.y = y;
                 
@@ -136,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tileEl.classList.remove('valid');
             tileEl.classList.add('empty');
         }
+        saveToLocalStorage();
     }
 
     document.addEventListener('mouseup', () => { isPainting = false; });
@@ -143,7 +258,9 @@ document.addEventListener('DOMContentLoaded', () => {
     btnResize.addEventListener('click', () => {
         gridW = parseInt(widthInput.value);
         gridH = parseInt(heightInput.value);
+        localStorage.removeItem('foe_city_valid_tiles');
         initGrid();
+        saveToLocalStorage();
     });
 
     btnPaint.addEventListener('click', () => {
@@ -193,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         renderBuildings();
+        saveToLocalStorage();
         addBuildingForm.reset();
     });
 
@@ -235,19 +353,48 @@ document.addEventListener('DOMContentLoaded', () => {
     window.removeBuildingGroup = (name) => {
         buildings = buildings.filter(b => b.name !== name);
         renderBuildings();
+        saveToLocalStorage();
     };
 
 
 
     btnOptimize.addEventListener('click', async () => {
-        const thFixed = document.getElementById('townhall-fixed').checked;
-        const optTime = parseFloat(document.getElementById('opt-time').value) || 10;
+        const thFixed = townhallFixedCheckbox.checked;
+        const optTime = parseFloat(optTimeInput.value) || 10;
+        
+        // Build custom_roads payload if "Use Painted Roads" is selected
+        let customRoads = null;
+        if ((solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming') && backboneSelect.value === 'custom') {
+            customRoads = [];
+            for (let y = 0; y < gridH; y++) {
+                for (let x = 0; x < gridW; x++) {
+                    if (!validTiles[y][x]) {
+                        customRoads.push({ x: x, y: y, type: 1 });
+                    }
+                }
+            }
+        }
+
+        // For custom roads, we pass a cloned validTiles where all road cells are marked valid (true)
+        // so the solver's tile validity checks pass.
+        let activeGridTiles = validTiles;
+        if (customRoads) {
+            activeGridTiles = validTiles.map(row => [...row]);
+            customRoads.forEach(r => {
+                activeGridTiles[r.y][r.x] = true;
+            });
+        }
+
         const payload = {
-            grid: { width: gridW, height: gridH, valid_tiles: validTiles },
+            grid: { width: gridW, height: gridH, valid_tiles: activeGridTiles },
             buildings: buildings,
             townhall_fixed: thFixed,
             townhall_pos: null,
-            optimization_time: optTime
+            optimization_time: optTime,
+            solver_type: solverSelect.value,
+            backbone_type: backboneSelect.value,
+            annealing_iterations: parseInt(annealingIterInput.value) || 1500,
+            custom_roads: customRoads
         };
         
         btnOptimize.textContent = "Solving...";
