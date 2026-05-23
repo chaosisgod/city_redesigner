@@ -411,9 +411,19 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         btnOptimize.textContent = "Solving...";
+        let countdownInterval = null;
         if (btnAbort) {
-            btnAbort.textContent = "Abort";
             btnAbort.disabled = false;
+            const endTime = Date.now() + optTime * 1000;
+            btnAbort.textContent = `Abort (${optTime.toFixed(1)}s)`;
+            
+            countdownInterval = setInterval(() => {
+                const remaining = Math.max(0, (endTime - Date.now()) / 1000);
+                btnAbort.textContent = `Abort (${remaining.toFixed(1)}s)`;
+                if (remaining <= 0) {
+                    clearInterval(countdownInterval);
+                }
+            }, 100);
         }
         try {
             const res = await fetch('/api/solve', {
@@ -461,6 +471,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnAbort) {
                 btnAbort.disabled = true;
                 btnAbort.textContent = "Abort";
+            }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
             }
         }
     });
