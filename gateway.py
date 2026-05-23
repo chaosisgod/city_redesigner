@@ -15,14 +15,6 @@ WINDOWS_PORT = 8000            # Port the Windows FastAPI server runs on
 PORT = 8080                    # Port to expose publicly on your Raspberry Pi
 
 class GatewayHandler(http.server.SimpleHTTPRequestHandler):
-    def translate_path(self, path):
-        # Serve assets directly from the 'static' directory
-        root = os.path.join(os.getcwd(), 'static')
-        relative_path = path.lstrip('/')
-        if not relative_path:
-            relative_path = 'index.html'
-        return os.path.join(root, relative_path)
-
     def do_POST(self):
         if self.path.startswith('/api/'):
             self.proxy_request('POST')
