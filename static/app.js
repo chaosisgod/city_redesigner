@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPaint = document.getElementById('btn-mode-paint');
     const btnErase = document.getElementById('btn-mode-erase');
     const btnOptimize = document.getElementById('btn-optimize');
+    const btnAbort = document.getElementById('btn-abort');
     
     const addBuildingForm = document.getElementById('add-building-form');
     const buildingsList = document.getElementById('buildings-list');
@@ -263,6 +264,18 @@ document.addEventListener('DOMContentLoaded', () => {
         saveToLocalStorage();
     });
 
+    if (btnAbort) {
+        btnAbort.addEventListener('click', async () => {
+            btnAbort.textContent = "Aborting...";
+            btnAbort.disabled = true;
+            try {
+                await fetch('/api/abort', { method: 'POST' });
+            } catch (e) {
+                console.error("Abort request failed:", e);
+            }
+        });
+    }
+
     btnPaint.addEventListener('click', () => {
         paintMode = true;
         btnPaint.classList.add('active');
@@ -398,6 +411,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         btnOptimize.textContent = "Solving...";
+        if (btnAbort) {
+            btnAbort.style.display = 'block';
+            btnAbort.textContent = "Abort";
+            btnAbort.disabled = false;
+        }
         try {
             const res = await fetch('/api/solve', {
                 method: 'POST',
@@ -406,6 +424,16 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await res.json();
             
+            if (res.status !== 200) {
+                document.getElementById('debug-output').value = data.detail || JSON.stringify(data, null, 2);
+                if (data.detail && data.detail.includes("aborted")) {
+                    alert("Optimization was aborted successfully.");
+                } else {
+                    alert("Error solving layout: " + (data.detail || "Unknown error"));
+                }
+                return;
+            }
+
             // Populate human-readable summary stats
             const summaryDiv = document.getElementById('solver-summary-stats');
             if (summaryDiv) {
@@ -429,8 +457,12 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(e);
             alert("Error solving layout");
             document.getElementById('debug-output').value = "Error: " + e.message;
+        } finally {
+            btnOptimize.textContent = "Optimize Layout";
+            if (btnAbort) {
+                btnAbort.style.display = 'none';
+            }
         }
-        btnOptimize.textContent = "Optimize Layout";
     });
 
     const tooltip = document.getElementById('tooltip');

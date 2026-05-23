@@ -19,9 +19,33 @@ async def root():
 
 @app.post("/api/solve", response_model=SolveResponse)
 async def solve(request: SolveRequest):
-    # Call the solver algorithm
-    result = solve_layout(request)
+    # Ensure abort lock is cleared at start
+    if os.path.exists("abort.lock"):
+        try: os.remove("abort.lock")
+        except: pass
+        
+    try:
+        # Call the solver algorithm
+        result = solve_layout(request)
+        if os.path.exists("abort.lock"):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Optimization aborted by user.")
+        if result is None:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Solver failed to produce a layout.")
+    finally:
+        # Clear abort lock at end
+        if os.path.exists("abort.lock"):
+            try: os.remove("abort.lock")
+            except: pass
+            
     return result
+
+@app.post("/api/abort")
+async def abort_solve():
+    with open("abort.lock", "w") as f:
+        f.write("abort requested")
+    return {"status": "abort requested"}
 
 @app.get("/api/catalog", response_model=List[CatalogBuilding])
 async def get_catalog():

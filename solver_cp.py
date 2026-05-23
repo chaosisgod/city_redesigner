@@ -223,6 +223,8 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
 
     # 6. Solve
     import os
+    if os.path.exists("abort.lock"):
+        return SolveResponse(placed_buildings=[], placed_roads=[], score=0.0)
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = request.optimization_time or 10.0
     solver.parameters.num_search_workers = max(1, os.cpu_count() or 4)

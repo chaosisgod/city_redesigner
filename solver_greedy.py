@@ -35,6 +35,9 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
     iterations = 0
     
     while time.time() < end_time or iterations == 0:
+        if os.path.exists("abort.lock"):
+            dprint("Abort requested. Exiting.")
+            break
         iterations += 1
         dprint(f"\n--- Starting iteration {iterations} ---")
         
@@ -489,6 +492,8 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
             futures = [executor.submit(solve_single_worker, request, seed) for seed in seeds]
             
             for future in as_completed(futures):
+                if os.path.exists("abort.lock"):
+                    break
                 try:
                     res = future.result()
                     if res and res.score > best_score:

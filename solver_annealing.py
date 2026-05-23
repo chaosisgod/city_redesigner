@@ -207,6 +207,8 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
     iterations = request.annealing_iterations or 1500
     
     for i in range(iterations):
+        if i % 10 == 0 and os.path.exists("abort.lock"):
+            break
         temp *= cooling_rate
         if not other_buildings: break
         
@@ -269,6 +271,8 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
     with ProcessPoolExecutor(max_workers=num_workers, mp_context=ctx) as executor:
         futures = [executor.submit(solve_single_worker, request, seed) for seed in seeds]
         for future in as_completed(futures):
+            if os.path.exists("abort.lock"):
+                break
             try:
                 res = future.result()
                 if res and res.score > best_score:

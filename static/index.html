@@ -70,7 +70,10 @@
                     <input type="checkbox" id="townhall-fixed" checked style="width: auto; cursor: pointer;">
                     Root Hub Position Fixed
                 </label>
-                <button id="btn-optimize" class="btn primary">Optimize Layout</button>
+                <div class="optimize-container" style="display: flex; gap: 8px; width: 100%;">
+                    <button id="btn-optimize" class="btn primary" style="flex: 2;">Optimize Layout</button>
+                    <button id="btn-abort" class="btn danger" style="display: none; flex: 1; background-color: var(--danger);">Abort</button>
+                </div>
             </div>
             
             <div class="panel debug-panel">
