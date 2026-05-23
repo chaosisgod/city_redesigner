@@ -412,7 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         btnOptimize.textContent = "Solving...";
         if (btnAbort) {
-            btnAbort.style.display = 'block';
             btnAbort.textContent = "Abort";
             btnAbort.disabled = false;
         }
@@ -460,7 +459,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             btnOptimize.textContent = "Optimize Layout";
             if (btnAbort) {
-                btnAbort.style.display = 'none';
+                btnAbort.disabled = true;
+                btnAbort.textContent = "Abort";
             }
         }
     });
