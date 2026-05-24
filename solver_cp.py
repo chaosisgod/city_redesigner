@@ -81,6 +81,39 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
             if valid_tiles[y][conn_x]:
                 roads[y][conn_x] = max(roads[y][conn_x], max_road_req)
 
+    elif backbone == "center_cross":
+        spine_y = grid_h // 2
+        spine_x = grid_w // 2
+        
+        # Horizontal Spine
+        for x in range(grid_w):
+            if valid_tiles[spine_y][x]:
+                roads[spine_y][x] = max(roads[spine_y][x], max_road_req)
+                if max_road_req == 2 and spine_y + 1 < grid_h and valid_tiles[spine_y + 1][x]:
+                    roads[spine_y + 1][x] = max(roads[spine_y + 1][x], 2)
+                    
+        # Vertical Spine
+        for y in range(grid_h):
+            if valid_tiles[y][spine_x]:
+                roads[y][spine_x] = max(roads[y][spine_x], max_road_req)
+                if max_road_req == 2 and spine_x + 1 < grid_w and valid_tiles[y][spine_x + 1]:
+                    roads[y][spine_x + 1] = max(roads[y][spine_x + 1], 2)
+                    
+        # Connect Hub to horizontal & vertical cross-spines
+        min_y = min(hub_y, spine_y)
+        max_y = max(hub_y + hub_h - 1, spine_y)
+        conn_x = hub_x + hub_w // 2
+        for y in range(min_y, max_y + 1):
+            if valid_tiles[y][conn_x]:
+                roads[y][conn_x] = max(roads[y][conn_x], max_road_req)
+                
+        min_x = min(hub_x, spine_x)
+        max_x = max(hub_x + hub_w - 1, spine_x)
+        conn_y = hub_y + hub_h // 2
+        for x in range(min_x, max_x + 1):
+            if valid_tiles[conn_y][x]:
+                roads[conn_y][x] = max(roads[conn_y][x], max_road_req)
+
     elif backbone == "grid":
         lanes = [y for y in range(2, grid_h, 5)]
         for lane_y in lanes:

@@ -89,6 +89,45 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
                 roads[y][conn_x] = max(roads[y][conn_x], max_road_req)
                 occupied[y][conn_x] = True
 
+    elif backbone == "center_cross":
+        spine_y = grid_h // 2
+        spine_x = grid_w // 2
+        
+        # Horizontal Spine
+        for x in range(grid_w):
+            if is_tile_valid(x, spine_y):
+                roads[spine_y][x] = max(roads[spine_y][x], max_road_req)
+                occupied[spine_y][x] = True
+                if max_road_req == 2 and spine_y + 1 < grid_h and is_tile_valid(x, spine_y + 1):
+                    roads[spine_y + 1][x] = max(roads[spine_y + 1][x], 2)
+                    occupied[spine_y + 1][x] = True
+                    
+        # Vertical Spine
+        for y in range(grid_h):
+            if is_tile_valid(spine_x, y):
+                roads[y][spine_x] = max(roads[y][spine_x], max_road_req)
+                occupied[y][spine_x] = True
+                if max_road_req == 2 and spine_x + 1 < grid_w and is_tile_valid(spine_x + 1, y):
+                    roads[y][spine_x + 1] = max(roads[y][spine_x + 1], 2)
+                    occupied[y][spine_x + 1] = True
+                    
+        # Connect Hub to horizontal & vertical cross-spines
+        min_y = min(hub_y, spine_y)
+        max_y = max(hub_y + hub_h - 1, spine_y)
+        conn_x = hub_x + hub_w // 2
+        for y in range(min_y, max_y + 1):
+            if is_tile_valid(conn_x, y):
+                roads[y][conn_x] = max(roads[y][conn_x], max_road_req)
+                occupied[y][conn_x] = True
+                
+        min_x = min(hub_x, spine_x)
+        max_x = max(hub_x + hub_w - 1, spine_x)
+        conn_y = hub_y + hub_h // 2
+        for x in range(min_x, max_x + 1):
+            if is_tile_valid(x, conn_y):
+                roads[conn_y][x] = max(roads[conn_y][x], max_road_req)
+                occupied[conn_y][x] = True
+
     elif backbone == "grid":
         lanes = [y for y in range(2, grid_h, 5)]
         for lane_y in lanes:
