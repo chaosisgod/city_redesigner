@@ -103,11 +103,13 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
             visited = {}
             for sx, sy in start_tiles:
                 if 0 <= sx < grid_w and 0 <= sy < grid_h:
-                    # Only allow starting from tiles that are either free or already roads.
-                    # This prevents placing a road on top of a tile occupied by another building.
-                    if not occupied[sy][sx] or roads[sy][sx] > 0:
-                        queue.append((sx, sy, 0))
-                        visited[(sx, sy)] = None
+                    # Do not allow starting inside the Townhall/hub itself (forbids 0-length roads).
+                    if (sx, sy) not in hub_tiles:
+                        # Only allow starting from tiles that are either free or already roads.
+                        # This prevents placing a road on top of a tile occupied by another building.
+                        if not occupied[sy][sx] or roads[sy][sx] > 0:
+                            queue.append((sx, sy, 0))
+                            visited[(sx, sy)] = None
                     
             head = 0
             found_dest = None

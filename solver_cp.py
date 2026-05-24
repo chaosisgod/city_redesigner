@@ -171,14 +171,14 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                     if not fits: break
                     
                 if fits:
-                    # Check if adjacent to road of sufficient type (or adjacent to Hub)
+                    # Check if adjacent to road of sufficient type
                     is_touching = False
                     for dx in range(b_w):
-                        if y - 1 >= 0 and (roads[y - 1][x + dx] >= req_road_type or (x + dx, y - 1) in hub_tiles): is_touching = True
-                        if y + b_h < grid_h and (roads[y + b_h][x + dx] >= req_road_type or (x + dx, y + b_h) in hub_tiles): is_touching = True
+                        if y - 1 >= 0 and roads[y - 1][x + dx] >= req_road_type: is_touching = True
+                        if y + b_h < grid_h and roads[y + b_h][x + dx] >= req_road_type: is_touching = True
                     for dy in range(b_h):
-                        if x - 1 >= 0 and (roads[y + dy][x - 1] >= req_road_type or (x - 1, y + dy) in hub_tiles): is_touching = True
-                        if x + b_w < grid_w and (roads[y + dy][x + b_w] >= req_road_type or (x + b_w, y + dy) in hub_tiles): is_touching = True
+                        if x - 1 >= 0 and roads[y + dy][x - 1] >= req_road_type: is_touching = True
+                        if x + b_w < grid_w and roads[y + dy][x + b_w] >= req_road_type: is_touching = True
                         
                     if is_touching:
                         valid_coords.append((x, y))

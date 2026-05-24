@@ -138,6 +138,38 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
                 if 0 <= pr.x < grid_w and 0 <= pr.y < grid_h:
                     roads[pr.y][pr.x] = max(roads[pr.y][pr.x], 1)
                     occupied[pr.y][pr.x] = True
+                    
+    # Pre-placement Backbone Pruning: Ensure only fully connected road segments are kept
+    connected_backbone = set()
+    queue = []
+    visited = {}
+    for th_tx, th_ty in hub_tiles:
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = th_tx + dx, th_ty + dy
+            if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                if roads[ny][nx] > 0 and (nx, ny) not in visited:
+                    visited[(nx, ny)] = None
+                    queue.append((nx, ny))
+                    
+    head = 0
+    while head < len(queue):
+        cx, cy = queue[head]
+        head += 1
+        connected_backbone.add((cx, cy))
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = cx + dx, cy + dy
+            if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                if roads[ny][nx] > 0 and (nx, ny) not in visited:
+                    visited[(nx, ny)] = (cx, cy)
+                    queue.append((nx, ny))
+                    
+    # Discard any disconnected backbone tiles and free their space for building placement
+    for y in range(grid_h):
+        for x in range(grid_w):
+            if (x, y) not in hub_tiles:
+                if roads[y][x] > 0 and (x, y) not in connected_backbone:
+                    roads[y][x] = 0
+                    occupied[y][x] = not valid_tiles[y][x]
 
     placed_buildings = [PlacedBuilding(building_id=hub.id, x=hub_x, y=hub_y)]
     
@@ -159,11 +191,11 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
         if req_road_type == 0:
             return True
         for dx in range(cw):
-            if cy - 1 >= 0 and (roads[cy-1][cx+dx] >= req_road_type or (cx+dx, cy-1) in hub_tiles): return True
-            if cy + ch < grid_h and (roads[cy+ch][cx+dx] >= req_road_type or (cx+dx, cy+ch) in hub_tiles): return True
+            if cy - 1 >= 0 and roads[cy-1][cx+dx] >= req_road_type: return True
+            if cy + ch < grid_h and roads[cy+ch][cx+dx] >= req_road_type: return True
         for dy in range(ch):
-            if cx - 1 >= 0 and (roads[cy+dy][cx-1] >= req_road_type or (cx-1, cy+dy) in hub_tiles): return True
-            if cx + cw < grid_w and (roads[cy+dy][cx+cw] >= req_road_type or (cx+cw, cy+dy) in hub_tiles): return True
+            if cx - 1 >= 0 and roads[cy+dy][cx-1] >= req_road_type: return True
+            if cx + cw < grid_w and roads[cy+dy][cx+cw] >= req_road_type: return True
         return False
 
     def can_place(x, y, w, h):

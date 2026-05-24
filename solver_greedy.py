@@ -190,11 +190,11 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
 
         def is_adjacent_to_road(cx, cy, cw, ch, req_road_type):
             for dx in range(cw):
-                if cy - 1 >= 0 and (roads[cy-1][cx+dx] >= req_road_type or (cx+dx, cy-1) in th_tiles): return True
-                if cy + ch < grid_h and (roads[cy+ch][cx+dx] >= req_road_type or (cx+dx, cy+ch) in th_tiles): return True
+                if cy - 1 >= 0 and roads[cy-1][cx+dx] >= req_road_type: return True
+                if cy + ch < grid_h and roads[cy+ch][cx+dx] >= req_road_type: return True
             for dy in range(ch):
-                if cx - 1 >= 0 and (roads[cy+dy][cx-1] >= req_road_type or (cx-1, cy+dy) in th_tiles): return True
-                if cx + cw < grid_w and (roads[cy+dy][cx+cw] >= req_road_type or (cx+cw, cy+dy) in th_tiles): return True
+                if cx - 1 >= 0 and roads[cy+dy][cx-1] >= req_road_type: return True
+                if cx + cw < grid_w and roads[cy+dy][cx+cw] >= req_road_type: return True
             return False
 
         def place_group(group, req_road_type):
