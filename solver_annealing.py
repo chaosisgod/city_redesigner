@@ -61,7 +61,7 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
 
     # Pre-generate road backbone
     init_roads = [[0 for _ in range(grid_w)] for _ in range(grid_h)]
-    init_occupied = [[not valid_tiles[y][x] for x in range(grid_w)] for _ in range(grid_h)]
+    init_occupied = [[not valid_tiles[y][x] for x in range(grid_w)] for y in range(grid_h)]
 
     # Seed the hub / Townhall tiles in both roads and occupied grids
     for tx, ty in hub_tiles:
