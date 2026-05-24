@@ -230,11 +230,11 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
         if req_road_type == 0:
             return True
         for dx in range(cw):
-            if cy - 1 >= 0 and roads[cy-1][cx+dx] >= req_road_type: return True
-            if cy + ch < grid_h and roads[cy+ch][cx+dx] >= req_road_type: return True
+            if cy - 1 >= 0 and req_road_type <= roads[cy-1][cx+dx] <= 2: return True
+            if cy + ch < grid_h and req_road_type <= roads[cy+ch][cx+dx] <= 2: return True
         for dy in range(ch):
-            if cx - 1 >= 0 and roads[cy+dy][cx-1] >= req_road_type: return True
-            if cx + cw < grid_w and roads[cy+dy][cx+cw] >= req_road_type: return True
+            if cx - 1 >= 0 and req_road_type <= roads[cy+dy][cx-1] <= 2: return True
+            if cx + cw < grid_w and req_road_type <= roads[cy+dy][cx+cw] <= 2: return True
         return False
 
     def can_place(x, y, w, h):

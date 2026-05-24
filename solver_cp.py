@@ -158,6 +158,37 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                 if 0 <= pr.x < grid_w and 0 <= pr.y < grid_h:
                     roads[pr.y][pr.x] = max(roads[pr.y][pr.x], 1)
 
+    # Pre-placement Backbone Pruning: Ensure only fully connected road segments are kept
+    connected_backbone = set()
+    queue = []
+    visited = {}
+    for th_tx, th_ty in hub_tiles:
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = th_tx + dx, th_ty + dy
+            if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                if roads[ny][nx] > 0 and (nx, ny) not in visited:
+                    visited[(nx, ny)] = None
+                    queue.append((nx, ny))
+                    
+    head = 0
+    while head < len(queue):
+        cx, cy = queue[head]
+        head += 1
+        connected_backbone.add((cx, cy))
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = cx + dx, cy + dy
+            if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                if roads[ny][nx] > 0 and (nx, ny) not in visited:
+                    visited[(nx, ny)] = (cx, cy)
+                    queue.append((nx, ny))
+                    
+    # Discard any disconnected backbone tiles and free their space for building placement
+    for y in range(grid_h):
+        for x in range(grid_w):
+            if (x, y) not in hub_tiles:
+                if roads[y][x] > 0 and (x, y) not in connected_backbone:
+                    roads[y][x] = 0
+
     # Initialize CP-SAT Model
     model = cp_model.CpModel()
     
@@ -207,11 +238,11 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
                     # Check if adjacent to road of sufficient type
                     is_touching = False
                     for dx in range(b_w):
-                        if y - 1 >= 0 and roads[y - 1][x + dx] >= req_road_type: is_touching = True
-                        if y + b_h < grid_h and roads[y + b_h][x + dx] >= req_road_type: is_touching = True
+                        if y - 1 >= 0 and req_road_type <= roads[y - 1][x + dx] <= 2: is_touching = True
+                        if y + b_h < grid_h and req_road_type <= roads[y + b_h][x + dx] <= 2: is_touching = True
                     for dy in range(b_h):
-                        if x - 1 >= 0 and roads[y + dy][x - 1] >= req_road_type: is_touching = True
-                        if x + b_w < grid_w and roads[y + dy][x + b_w] >= req_road_type: is_touching = True
+                        if x - 1 >= 0 and req_road_type <= roads[y + dy][x - 1] <= 2: is_touching = True
+                        if x + b_w < grid_w and req_road_type <= roads[y + dy][x + b_w] <= 2: is_touching = True
                         
                     if is_touching:
                         valid_coords.append((x, y))
