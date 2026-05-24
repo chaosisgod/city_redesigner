@@ -138,10 +138,13 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
             return None
 
         disconnected_count = 0
+        connected_placed_b = [PlacedBuilding(building_id=hub.id, x=hub_x, y=hub_y)]
         for pb in final_placed_b:
             if pb.building_id == hub.id: continue
             b = next(x for x in other_buildings if x.id == pb.building_id)
-            if b.road_type == 0: continue
+            if b.road_type == 0:
+                connected_placed_b.append(pb)
+                continue
             
             boundary = set()
             for dx in range(b.width):
@@ -156,6 +159,7 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
                 for rx, ry in path:
                     roads[ry][rx] = max(roads[ry][rx], b.road_type)
                     occupied[ry][rx] = True
+                connected_placed_b.append(pb)
             else:
                 disconnected_count += 1
 
@@ -175,11 +179,11 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
                     final_placed_roads.append(PlacedRoad(x=x, y=y, type=1))
                     road_tiles_used.add((x, y))
 
-        num_placed = len(final_placed_b)
+        num_placed = len(connected_placed_b)
         road_cost = sum(1 for pr in final_placed_roads for dy in range(pr.type) for dx in range(pr.type))
-        score = num_placed * 10000 - road_cost - (disconnected_count * 15000)
+        score = num_placed * 10000 - road_cost - (disconnected_count * 200000)
         
-        return final_placed_b, final_placed_roads, score, valid_placed_b_map
+        return connected_placed_b, final_placed_roads, score, valid_placed_b_map
 
     current_b_map = {}
     b_order = other_buildings.copy()
