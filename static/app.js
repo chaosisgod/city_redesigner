@@ -130,9 +130,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateSolverParamsVisibility() {
         const solver = solverSelect.value;
-        const isCustomActive = (solver === 'backbone' || solver === 'constraint_programming') && backboneSelect.value === 'custom';
+        const isCustomActive = (solver === 'backbone' || solver === 'constraint_programming' || solver === 'simulated_annealing') && backboneSelect.value === 'custom';
         
-        backboneParams.style.display = (solver === 'backbone' || solver === 'constraint_programming') ? 'flex' : 'none';
+        backboneParams.style.display = (solver === 'backbone' || solver === 'constraint_programming' || solver === 'simulated_annealing') ? 'flex' : 'none';
         annealingParams.style.display = solver === 'simulated_annealing' ? 'flex' : 'none';
         
         const roadTypeContainer = document.getElementById('paint-road-type-container');
@@ -372,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function refreshGridVisuals() {
-        const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming') && backboneSelect.value === 'custom';
+        const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming' || solverSelect.value === 'simulated_annealing') && backboneSelect.value === 'custom';
         const tiles = gridEl.children;
         if (!tiles || tiles.length === 0) return;
         
@@ -450,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function toggleTile(x, y, tileEl) {
-        const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming') && backboneSelect.value === 'custom';
+        const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming' || solverSelect.value === 'simulated_annealing') && backboneSelect.value === 'custom';
         
         // Don't paint tiles that are occupied by the root hub
         const isWithinRootHub = x >= rootHubX && x < rootHubX + buildings[0].width && y >= rootHubY && y < rootHubY + buildings[0].height;
@@ -609,7 +609,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Build custom_roads payload if "Use Painted Roads" is selected
         let customRoads = null;
-        if ((solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming') && backboneSelect.value === 'custom') {
+        if ((solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming' || solverSelect.value === 'simulated_annealing') && backboneSelect.value === 'custom') {
             customRoads = [];
             for (let y = 0; y < gridH; y++) {
                 for (let x = 0; x < gridW; x++) {

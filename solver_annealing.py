@@ -59,13 +59,165 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
 
     hub_tiles = set((hub_x + dx, hub_y + dy) for dy in range(hub_h) for dx in range(hub_w))
 
+    # Pre-generate road backbone
+    init_roads = [[0 for _ in range(grid_w)] for _ in range(grid_h)]
+    init_occupied = [[not valid_tiles[y][x] for x in range(grid_w)] for _ in range(grid_h)]
+
+    # Seed the hub / Townhall tiles in both roads and occupied grids
+    for tx, ty in hub_tiles:
+        if 0 <= tx < grid_w and 0 <= ty < grid_h:
+            init_occupied[ty][tx] = True
+            init_roads[ty][tx] = 3
+
+    backbone = request.backbone_type or "none"
+    
+    if backbone != "none":
+        max_road_req = 1
+        if any(b.road_type == 2 for b in other_buildings):
+            max_road_req = 2
+            
+        if backbone == "center_spine":
+            spine_y = grid_h // 2
+            for x in range(grid_w):
+                if is_tile_valid(x, spine_y):
+                    init_roads[spine_y][x] = max(init_roads[spine_y][x], max_road_req)
+                    init_occupied[spine_y][x] = True
+                    if max_road_req == 2 and spine_y + 1 < grid_h and is_tile_valid(x, spine_y + 1):
+                        init_roads[spine_y + 1][x] = max(init_roads[spine_y + 1][x], 2)
+                        init_occupied[spine_y + 1][x] = True
+                        
+            min_y = min(hub_y, spine_y)
+            max_y = max(hub_y + hub_h - 1, spine_y)
+            conn_x = hub_x + hub_w // 2
+            for y in range(min_y, max_y + 1):
+                if is_tile_valid(conn_x, y):
+                    init_roads[y][conn_x] = max(init_roads[y][conn_x], max_road_req)
+                    init_occupied[y][conn_x] = True
+
+        elif backbone == "center_cross":
+            spine_y = grid_h // 2
+            spine_x = grid_w // 2
+            
+            # Horizontal Spine
+            for x in range(grid_w):
+                if is_tile_valid(x, spine_y):
+                    init_roads[spine_y][x] = max(init_roads[spine_y][x], max_road_req)
+                    init_occupied[spine_y][x] = True
+                    if max_road_req == 2 and spine_y + 1 < grid_h and is_tile_valid(x, spine_y + 1):
+                        init_roads[spine_y + 1][x] = max(init_roads[spine_y + 1][x], 2)
+                        init_occupied[spine_y + 1][x] = True
+                        
+            # Vertical Spine
+            for y in range(grid_h):
+                if is_tile_valid(spine_x, y):
+                    init_roads[y][spine_x] = max(init_roads[y][spine_x], max_road_req)
+                    init_occupied[y][spine_x] = True
+                    if max_road_req == 2 and spine_x + 1 < grid_w and is_tile_valid(spine_x + 1, y):
+                        init_roads[y][spine_x + 1] = max(init_roads[y][spine_x + 1], 2)
+                        init_occupied[y][spine_x + 1] = True
+                        
+            # Connect Hub to horizontal & vertical cross-spines
+            min_y = min(hub_y, spine_y)
+            max_y = max(hub_y + hub_h - 1, spine_y)
+            conn_x = hub_x + hub_w // 2
+            for y in range(min_y, max_y + 1):
+                if is_tile_valid(conn_x, y):
+                    init_roads[y][conn_x] = max(init_roads[y][conn_x], max_road_req)
+                    init_occupied[y][conn_x] = True
+                    
+            min_x = min(hub_x, spine_x)
+            max_x = max(hub_x + hub_w - 1, spine_x)
+            conn_y = hub_y + hub_h // 2
+            for x in range(min_x, max_x + 1):
+                if is_tile_valid(x, conn_y):
+                    init_roads[conn_y][x] = max(init_roads[conn_y][x], max_road_req)
+                    init_occupied[conn_y][x] = True
+
+        elif backbone == "grid":
+            lanes = [y for y in range(2, grid_h, 5)]
+            for lane_y in lanes:
+                for x in range(grid_w):
+                    if is_tile_valid(x, lane_y):
+                        init_roads[lane_y][x] = max(init_roads[lane_y][x], max_road_req)
+                        init_occupied[lane_y][x] = True
+                        if max_road_req == 2 and lane_y + 1 < grid_h and is_tile_valid(x, lane_y + 1):
+                            init_roads[lane_y + 1][x] = max(init_roads[lane_y + 1][x], 2)
+                            init_occupied[lane_y + 1][x] = True
+                            
+            conn_x = hub_x + hub_w // 2
+            for y in range(grid_h):
+                if is_tile_valid(conn_x, y):
+                    init_roads[y][conn_x] = max(init_roads[y][conn_x], max_road_req)
+                    init_occupied[y][conn_x] = True
+
+        elif backbone == "perimeter":
+            for y in range(grid_h):
+                for x in range(grid_w):
+                    if is_tile_valid(x, y):
+                        is_border = False
+                        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                            if not is_tile_valid(x + dx, y + dy):
+                                is_border = True
+                                break
+                        if is_border:
+                            init_roads[y][x] = max(init_roads[y][x], max_road_req)
+                            init_occupied[y][x] = True
+                            
+            conn_x = hub_x + hub_w // 2
+            for y in range(grid_h):
+                if is_tile_valid(conn_x, y):
+                    init_roads[y][conn_x] = max(init_roads[y][conn_x], max_road_req)
+                    init_occupied[y][conn_x] = True
+
+        elif backbone == "custom" and request.custom_roads:
+            for pr in request.custom_roads:
+                if pr.type == 2:
+                    for dy in range(2):
+                        for dx in range(2):
+                            rx, ry = pr.x + dx, pr.y + dy
+                            if 0 <= rx < grid_w and 0 <= ry < grid_h:
+                                init_roads[ry][rx] = max(init_roads[ry][rx], 2)
+                                init_occupied[ry][rx] = True
+                else:
+                    if 0 <= pr.x < grid_w and 0 <= pr.y < grid_h:
+                        init_roads[pr.y][pr.x] = max(init_roads[pr.y][pr.x], 1)
+                        init_occupied[pr.y][pr.x] = True
+
+        # Pre-placement Backbone Pruning: Ensure only fully connected road segments are kept
+        connected_backbone = set()
+        queue = []
+        visited = {}
+        for th_tx, th_ty in hub_tiles:
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = th_tx + dx, th_ty + dy
+                if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                    if init_roads[ny][nx] > 0 and (nx, ny) not in visited:
+                        visited[(nx, ny)] = None
+                        queue.append((nx, ny))
+                        
+        head = 0
+        while head < len(queue):
+            cx, cy = queue[head]
+            head += 1
+            connected_backbone.add((cx, cy))
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                    if init_roads[ny][nx] > 0 and (nx, ny) not in visited:
+                        visited[(nx, ny)] = (cx, cy)
+                        queue.append((nx, ny))
+                        
+        # Discard any disconnected backbone tiles and free their space for building placement
+        for y in range(grid_h):
+            for x in range(grid_w):
+                if (x, y) not in hub_tiles:
+                    if init_roads[y][x] > 0 and (x, y) not in connected_backbone:
+                        init_roads[y][x] = 0
+                        init_occupied[y][x] = not valid_tiles[y][x]
+
     def evaluate_state(placed_b_map):
-        occupied = [[not valid_tiles[y][x] for x in range(grid_w)] for y in range(grid_h)]
+        occupied = [row[:] for row in init_occupied]
         
-        for tx, ty in hub_tiles:
-            if 0 <= tx < grid_w and 0 <= ty < grid_h:
-                occupied[ty][tx] = True
-                
         final_placed_b = [PlacedBuilding(building_id=hub.id, x=hub_x, y=hub_y)]
         
         b_list = []
@@ -92,10 +244,7 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
                 final_placed_b.append(PlacedBuilding(building_id=b.id, x=bx, y=by))
                 valid_placed_b_map[b.id] = (bx, by)
 
-        roads = [[0 for _ in range(grid_w)] for _ in range(grid_h)]
-        for tx, ty in hub_tiles:
-            roads[ty][tx] = 3
-            
+        roads = [row[:] for row in init_roads]
         final_placed_roads = []
         
         def find_shortest_road_path(start_tiles, req_type):
@@ -103,10 +252,7 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
             visited = {}
             for sx, sy in start_tiles:
                 if 0 <= sx < grid_w and 0 <= sy < grid_h:
-                    # Do not allow starting inside the Townhall/hub itself (forbids 0-length roads).
                     if (sx, sy) not in hub_tiles:
-                        # Only allow starting from tiles that are either free or already roads.
-                        # This prevents placing a road on top of a tile occupied by another building.
                         if not occupied[sy][sx] or roads[sy][sx] > 0:
                             queue.append((sx, sy, 0))
                             visited[(sx, sy)] = None
@@ -139,7 +285,6 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
                 return path[::-1]
             return None
 
-        disconnected_count = 0
         connected_placed_b = [PlacedBuilding(building_id=hub.id, x=hub_x, y=hub_y)]
         for pb in final_placed_b:
             if pb.building_id == hub.id: continue
@@ -162,8 +307,62 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
                     roads[ry][rx] = max(roads[ry][rx], b.road_type)
                     occupied[ry][rx] = True
                 connected_placed_b.append(pb)
-            else:
-                disconnected_count += 1
+
+        # Post-placement BFS road pruning: keep only road tiles that are part of a path from a placed building to the hub
+        keep_tiles = set()
+        prune_queue = []
+        prune_visited = {}
+        for th_tx, th_ty in hub_tiles:
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = th_tx + dx, th_ty + dy
+                if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                    if roads[ny][nx] > 0 and (nx, ny) not in prune_visited:
+                        prune_visited[(nx, ny)] = None
+                        prune_queue.append((nx, ny))
+                        
+        head = 0
+        while head < len(prune_queue):
+            cx, cy = prune_queue[head]
+            head += 1
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                    if roads[ny][nx] > 0 and (nx, ny) not in prune_visited:
+                        prune_visited[(nx, ny)] = (cx, cy)
+                        prune_queue.append((nx, ny))
+
+        building_road_types = {b.id: b.road_type for b in buildings}
+        for pb in connected_placed_b:
+            if pb.building_id == hub.id: continue
+            req_type = building_road_types[pb.building_id]
+            if req_type == 0: continue
+            
+            b = next(x for x in buildings if x.id == pb.building_id)
+            w, h = b.width, b.height
+            
+            connected_tiles = []
+            for dx in range(w):
+                if pb.y - 1 >= 0 and roads[pb.y - 1][pb.x + dx] >= req_type and (pb.x + dx, pb.y - 1) in prune_visited:
+                    connected_tiles.append((pb.x + dx, pb.y - 1))
+                if pb.y + h < grid_h and roads[pb.y + h][pb.x + dx] >= req_type and (pb.x + dx, pb.y + h) in prune_visited:
+                    connected_tiles.append((pb.x + dx, pb.y + h))
+            for dy in range(h):
+                if pb.x - 1 >= 0 and roads[pb.y + dy][pb.x - 1] >= req_type and (pb.x - 1, pb.y + dy) in prune_visited:
+                    connected_tiles.append((pb.x - 1, pb.y + dy))
+                if pb.x + w < grid_w and roads[pb.y + dy][pb.x + w] >= req_type and (pb.x + w, pb.y + dy) in prune_visited:
+                    connected_tiles.append((pb.x + w, pb.y + dy))
+                    
+            for start_tile in connected_tiles:
+                curr = start_tile
+                while curr is not None:
+                    keep_tiles.add(curr)
+                    curr = prune_visited[curr]
+
+        # Clean/prune all unused roads
+        for y in range(grid_h):
+            for x in range(grid_w):
+                if (x, y) not in hub_tiles and (x, y) not in keep_tiles:
+                    roads[y][x] = 0
 
         road_tiles_used = set()
         for y in range(grid_h):
@@ -182,8 +381,9 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
                     road_tiles_used.add((x, y))
 
         num_placed = len(connected_placed_b)
+        missing_count = len(buildings) - num_placed
         road_cost = sum(1 for pr in final_placed_roads for dy in range(pr.type) for dx in range(pr.type))
-        score = num_placed * 10000 - road_cost - (disconnected_count * 200000)
+        score = num_placed * 10000 - road_cost - (missing_count * 200000)
         
         return connected_placed_b, final_placed_roads, score, valid_placed_b_map
 
@@ -193,18 +393,18 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
     
     for b in b_order:
         placed = False
-        for _ in range(20):
+        for _ in range(50):
             rx = random.randint(0, grid_w - b.width)
             ry = random.randint(0, grid_h - b.height)
-            overlap_hub = False
+            overlap = False
             for dy in range(b.height):
                 for dx in range(b.width):
-                    if (rx+dx, ry+dy) in hub_tiles or not is_tile_valid(rx+dx, ry+dy):
-                        overlap_hub = True
+                    if init_occupied[ry+dy][rx+dx]:
+                        overlap = True
                         break
-                if overlap_hub: break
+                if overlap: break
                 
-            if not overlap_hub:
+            if not overlap:
                 current_b_map[b.id] = (rx, ry)
                 placed = True
                 break
@@ -227,9 +427,19 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
         if perturb_type == "shift" and next_b_map:
             b_id = random.choice(list(next_b_map.keys()))
             b = next(x for x in other_buildings if x.id == b_id)
-            nx = random.randint(0, grid_w - b.width)
-            ny = random.randint(0, grid_h - b.height)
-            next_b_map[b_id] = (nx, ny)
+            for _ in range(10):
+                nx = random.randint(0, grid_w - b.width)
+                ny = random.randint(0, grid_h - b.height)
+                overlap = False
+                for dy in range(b.height):
+                    for dx in range(b.width):
+                        if init_occupied[ny+dy][nx+dx]:
+                            overlap = True
+                            break
+                    if overlap: break
+                if not overlap:
+                    next_b_map[b_id] = (nx, ny)
+                    break
             
         elif perturb_type == "swap" and len(next_b_map) >= 2:
             id1, id2 = random.sample(list(next_b_map.keys()), 2)
@@ -240,9 +450,19 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
             if b.id in next_b_map:
                 del next_b_map[b.id]
             else:
-                rx = random.randint(0, grid_w - b.width)
-                ry = random.randint(0, grid_h - b.height)
-                next_b_map[b.id] = (rx, ry)
+                for _ in range(10):
+                    rx = random.randint(0, grid_w - b.width)
+                    ry = random.randint(0, grid_h - b.height)
+                    overlap = False
+                    for dy in range(b.height):
+                        for dx in range(b.width):
+                            if init_occupied[ry+dy][rx+dx]:
+                                overlap = True
+                                break
+                        if overlap: break
+                    if not overlap:
+                        next_b_map[b.id] = (rx, ry)
+                        break
 
         next_placed_b, next_placed_roads, next_score, next_valid_b_map = evaluate_state(next_b_map)
         
