@@ -34,6 +34,30 @@ document.addEventListener('DOMContentLoaded', () => {
     let isPainting = false;
     let paintMode = true; // true = paint valid, false = erase
     
+    let isDraggingHub = false;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let rootHubX = null;
+    let rootHubY = null;
+
+    function initHubPosition() {
+        const rootW = buildings[0].width;
+        const rootH = buildings[0].height;
+        const savedHubX = localStorage.getItem('foe_city_root_hub_x');
+        const savedHubY = localStorage.getItem('foe_city_root_hub_y');
+        if (savedHubX !== null && savedHubY !== null) {
+            rootHubX = parseInt(savedHubX);
+            rootHubY = parseInt(savedHubY);
+            if (rootHubX < 0 || rootHubX + rootW > gridW || rootHubY < 0 || rootHubY + rootH > gridH) {
+                rootHubX = Math.max(0, Math.floor((gridW - rootW) / 2));
+                rootHubY = Math.max(0, Math.floor((gridH - rootH) / 2));
+            }
+        } else {
+            rootHubX = Math.max(0, Math.floor((gridW - rootW) / 2));
+            rootHubY = Math.max(0, Math.floor((gridH - rootH) / 2));
+        }
+    }
+    
     // Restore buildings inventory from localStorage
     const savedBuildings = localStorage.getItem('foe_city_buildings');
     let buildings = savedBuildings ? JSON.parse(savedBuildings) : [
@@ -86,6 +110,8 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('foe_city_building_counter', buildingIdCounter);
         localStorage.setItem('foe_city_valid_tiles', JSON.stringify(validTiles));
         localStorage.setItem('foe_city_painted_roads', JSON.stringify(paintedRoads));
+        localStorage.setItem('foe_city_root_hub_x', rootHubX);
+        localStorage.setItem('foe_city_root_hub_y', rootHubY);
         
         if (rootSelect) {
             localStorage.setItem('foe_city_root_type', rootSelect.value);
@@ -172,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
         renderBuildings();
+        initHubPosition();
         refreshGridVisuals();
         saveToLocalStorage();
     }
@@ -294,12 +321,112 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             paintedRoads = Array(gridH).fill().map(() => Array(gridW).fill(0));
         }
-        
-        const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming') && backboneSelect.value === 'custom';
 
+        initHubPosition();
+        
         for (let y = 0; y < gridH; y++) {
             for (let x = 0; x < gridW; x++) {
                 const tile = document.createElement('div');
+                tile.dataset.x = x;
+                tile.dataset.y = y;
+                
+                tile.addEventListener('mousedown', (e) => {
+                    const rootW = buildings[0].width;
+                    const rootH = buildings[0].height;
+                    const isWithinRootHub = x >= rootHubX && x < rootHubX + rootW && y >= rootHubY && y < rootHubY + rootH;
+                    
+                    if (isWithinRootHub) {
+                        isDraggingHub = true;
+                        dragOffsetX = x - rootHubX;
+                        dragOffsetY = y - rootHubY;
+                    } else {
+                        isPainting = true;
+                        refreshGridVisuals();
+                        toggleTile(x, y, tile);
+                    }
+                });
+                tile.addEventListener('mouseenter', (e) => {
+                    if (isDraggingHub) {
+                        const rootW = buildings[0].width;
+                        const rootH = buildings[0].height;
+                        
+                        const newX = x - dragOffsetX;
+                        const newY = y - dragOffsetY;
+                        
+                        if (newX >= 0 && newX + rootW <= gridW && newY >= 0 && newY + rootH <= gridH) {
+                            if (newX !== rootHubX || newY !== rootHubY) {
+                                rootHubX = newX;
+                                rootHubY = newY;
+                                refreshGridVisuals();
+                            }
+                        }
+                    } else if (isPainting) {
+                        toggleTile(x, y, tile);
+                    }
+                });
+                
+                gridEl.appendChild(tile);
+            }
+        }
+        refreshGridVisuals();
+    }
+
+    function refreshGridVisuals() {
+        const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming') && backboneSelect.value === 'custom';
+        const tiles = gridEl.children;
+        if (!tiles || tiles.length === 0) return;
+        
+        const rootW = buildings[0].width;
+        const rootH = buildings[0].height;
+        
+        if (rootHubX === null || rootHubY === null) {
+            initHubPosition();
+        }
+        
+        // Check if root hub overlaps with any invalid tiles
+        let hubHasOverlaps = false;
+        for (let dy = 0; dy < rootH; dy++) {
+            for (let dx = 0; dx < rootW; dx++) {
+                const tx = rootHubX + dx;
+                const ty = rootHubY + dy;
+                if (tx >= 0 && tx < gridW && ty >= 0 && ty < gridH) {
+                    if (!validTiles[ty][tx]) {
+                        hubHasOverlaps = true;
+                        break;
+                    }
+                }
+            }
+            if (hubHasOverlaps) break;
+        }
+
+        for (let i = 0; i < tiles.length; i++) {
+            const tile = tiles[i];
+            const x = parseInt(tile.dataset.x);
+            const y = parseInt(tile.dataset.y);
+            if (isNaN(x) || isNaN(y)) continue;
+            
+            tile.style.backgroundColor = '';
+            tile.style.borderTop = '';
+            tile.style.borderBottom = '';
+            tile.style.borderLeft = '';
+            tile.style.borderRight = '';
+            delete tile.dataset.name;
+
+            const isWithinRootHub = x >= rootHubX && x < rootHubX + rootW && y >= rootHubY && y < rootHubY + rootH;
+            
+            if (isWithinRootHub) {
+                tile.className = 'tile th';
+                tile.dataset.name = buildings[0].name;
+                
+                const dx = x - rootHubX;
+                const dy = y - rootHubY;
+                const borderStyle = hubHasOverlaps ? '2px solid var(--danger)' : '2px solid var(--tile-th)';
+                
+                tile.style.borderTop = dy === 0 ? borderStyle : '';
+                tile.style.borderBottom = dy === rootH - 1 ? borderStyle : '';
+                tile.style.borderLeft = dx === 0 ? borderStyle : '';
+                tile.style.borderRight = dx === rootW - 1 ? borderStyle : '';
+            } else {
                 const isValid = validTiles[y][x];
                 const roadVal = paintedRoads[y][x];
                 
@@ -313,58 +440,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 tile.className = classNames.join(' ');
-                tile.dataset.x = x;
-                tile.dataset.y = y;
-                
-                tile.addEventListener('mousedown', (e) => {
-                    isPainting = true;
-                    refreshGridVisuals();
-                    toggleTile(x, y, tile);
-                });
-                tile.addEventListener('mouseenter', (e) => {
-                    if (isPainting) toggleTile(x, y, tile);
-                });
-                
-                gridEl.appendChild(tile);
             }
         }
-    }
 
-    function refreshGridVisuals() {
-        const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming') && backboneSelect.value === 'custom';
-        const tiles = gridEl.children;
-        
-        for (let i = 0; i < tiles.length; i++) {
-            const tile = tiles[i];
-            const x = parseInt(tile.dataset.x);
-            const y = parseInt(tile.dataset.y);
-            if (isNaN(x) || isNaN(y)) continue;
-            
-            const isValid = validTiles[y][x];
-            const roadVal = paintedRoads[y][x];
-            
-            let classNames = ['tile'];
-            if (isCustomRoadsActive && roadVal === 1) {
-                classNames.push('road-painted-1');
-            } else if (isCustomRoadsActive && roadVal === 2) {
-                classNames.push('road-painted-2');
-            } else {
-                classNames.push(isValid ? 'valid' : 'empty');
-            }
-            
-            tile.className = classNames.join(' ');
-            tile.style.backgroundColor = '';
-            tile.style.borderTop = '';
-            tile.style.borderBottom = '';
-            tile.style.borderLeft = '';
-            tile.style.borderRight = '';
-            delete tile.dataset.name;
+        const summaryDiv = document.getElementById('solver-summary-stats');
+        if (summaryDiv) {
+            summaryDiv.innerHTML = '';
         }
     }
 
     function toggleTile(x, y, tileEl) {
         const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming') && backboneSelect.value === 'custom';
         
+        // Don't paint tiles that are occupied by the root hub
+        const isWithinRootHub = x >= rootHubX && x < rootHubX + buildings[0].width && y >= rootHubY && y < rootHubY + buildings[0].height;
+        if (isWithinRootHub) return;
+
         if (isCustomRoadsActive) {
             if (paintMode) {
                 const roadType = parseInt(document.getElementById('paint-road-type')?.value || '1');
@@ -386,7 +477,13 @@ document.addEventListener('DOMContentLoaded', () => {
         saveToLocalStorage();
     }
 
-    document.addEventListener('mouseup', () => { isPainting = false; });
+    document.addEventListener('mouseup', () => { 
+        isPainting = false; 
+        if (isDraggingHub) {
+            isDraggingHub = false;
+            saveToLocalStorage();
+        }
+    });
 
     btnResize.addEventListener('click', () => {
         gridW = parseInt(widthInput.value);
@@ -552,7 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
             grid: { width: gridW, height: gridH, valid_tiles: activeGridTiles },
             buildings: buildings,
             townhall_fixed: thFixed,
-            townhall_pos: null,
+            townhall_pos: thFixed ? [rootHubX, rootHubY] : null,
             optimization_time: optTime,
             solver_type: solverSelect.value,
             backbone_type: backboneSelect.value,
@@ -692,6 +789,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!b) return;
             // if it's townhall, color differently
             const isTH = b.name.toLowerCase().includes('townhall') || b.name.toLowerCase().includes('embassy');
+            if (isTH) {
+                rootHubX = pb.x;
+                rootHubY = pb.y;
+                saveToLocalStorage();
+            }
             for(let dy=0; dy<b.height; dy++) {
                 for(let dx=0; dx<b.width; dx++) {
                     const idx = (pb.y + dy) * gridW + (pb.x + dx);
