@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     heightInput.value = gridH;
 
     let validTiles = [];
+    let paintedRoads = [];
     let isPainting = false;
     let paintMode = true; // true = paint valid, false = erase
     
@@ -84,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('foe_city_buildings', JSON.stringify(buildings));
         localStorage.setItem('foe_city_building_counter', buildingIdCounter);
         localStorage.setItem('foe_city_valid_tiles', JSON.stringify(validTiles));
+        localStorage.setItem('foe_city_painted_roads', JSON.stringify(paintedRoads));
         
         if (rootSelect) {
             localStorage.setItem('foe_city_root_type', rootSelect.value);
@@ -102,17 +104,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateSolverParamsVisibility() {
         const solver = solverSelect.value;
+        const isCustomActive = (solver === 'backbone' || solver === 'constraint_programming') && backboneSelect.value === 'custom';
+        
         backboneParams.style.display = (solver === 'backbone' || solver === 'constraint_programming') ? 'flex' : 'none';
         annealingParams.style.display = solver === 'simulated_annealing' ? 'flex' : 'none';
         
+        const roadTypeContainer = document.getElementById('paint-road-type-container');
+        if (roadTypeContainer) {
+            roadTypeContainer.style.display = isCustomActive ? 'flex' : 'none';
+        }
+        
         // Custom labels for custom backbone painted roads
-        if ((solver === 'backbone' || solver === 'constraint_programming') && backboneSelect.value === 'custom') {
+        if (isCustomActive) {
             btnPaint.textContent = "Paint Custom Roads";
             btnErase.textContent = "Erase Roads";
         } else {
             btnPaint.textContent = "Paint Map";
             btnErase.textContent = "Erase Map";
         }
+        
+        refreshGridVisuals();
     }
 
     if (solverSelect) {
@@ -262,12 +273,42 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             validTiles = Array(gridH).fill().map(() => Array(gridW).fill(true));
         }
+
+        // Restore painted roads if dimensions match
+        let savedRoads = localStorage.getItem('foe_city_painted_roads');
+        if (savedRoads) {
+            try {
+                let parsed = JSON.parse(savedRoads);
+                if (parsed.length === gridH && parsed[0].length === gridW) {
+                    paintedRoads = parsed;
+                } else {
+                    paintedRoads = Array(gridH).fill().map(() => Array(gridW).fill(0));
+                }
+            } catch (e) {
+                paintedRoads = Array(gridH).fill().map(() => Array(gridW).fill(0));
+            }
+        } else {
+            paintedRoads = Array(gridH).fill().map(() => Array(gridW).fill(0));
+        }
         
+        const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming') && backboneSelect.value === 'custom';
+
         for (let y = 0; y < gridH; y++) {
             for (let x = 0; x < gridW; x++) {
                 const tile = document.createElement('div');
                 const isValid = validTiles[y][x];
-                tile.className = isValid ? 'tile valid' : 'tile empty';
+                const roadVal = paintedRoads[y][x];
+                
+                let classNames = ['tile'];
+                if (isCustomRoadsActive && roadVal === 1) {
+                    classNames.push('road-painted-1');
+                } else if (isCustomRoadsActive && roadVal === 2) {
+                    classNames.push('road-painted-2');
+                } else {
+                    classNames.push(isValid ? 'valid' : 'empty');
+                }
+                
+                tile.className = classNames.join(' ');
                 tile.dataset.x = x;
                 tile.dataset.y = y;
                 
@@ -284,14 +325,58 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function refreshGridVisuals() {
+        const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming') && backboneSelect.value === 'custom';
+        const tiles = gridEl.children;
+        
+        for (let i = 0; i < tiles.length; i++) {
+            const tile = tiles[i];
+            const x = parseInt(tile.dataset.x);
+            const y = parseInt(tile.dataset.y);
+            if (isNaN(x) || isNaN(y)) continue;
+            
+            const isValid = validTiles[y][x];
+            const roadVal = paintedRoads[y][x];
+            
+            let classNames = ['tile'];
+            if (isCustomRoadsActive && roadVal === 1) {
+                classNames.push('road-painted-1');
+            } else if (isCustomRoadsActive && roadVal === 2) {
+                classNames.push('road-painted-2');
+            } else {
+                classNames.push(isValid ? 'valid' : 'empty');
+            }
+            
+            tile.className = classNames.join(' ');
+            tile.style.backgroundColor = '';
+            tile.style.borderTop = '';
+            tile.style.borderBottom = '';
+            tile.style.borderLeft = '';
+            tile.style.borderRight = '';
+            delete tile.dataset.name;
+        }
+    }
+
     function toggleTile(x, y, tileEl) {
-        validTiles[y][x] = paintMode;
-        if (paintMode) {
-            tileEl.classList.add('valid');
-            tileEl.classList.remove('empty');
+        const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming') && backboneSelect.value === 'custom';
+        
+        if (isCustomRoadsActive) {
+            if (paintMode) {
+                const roadType = parseInt(document.getElementById('paint-road-type')?.value || '1');
+                paintedRoads[y][x] = roadType;
+                tileEl.className = 'tile ' + (roadType === 2 ? 'road-painted-2' : 'road-painted-1');
+            } else {
+                paintedRoads[y][x] = 0;
+                const isValid = validTiles[y][x];
+                tileEl.className = 'tile ' + (isValid ? 'valid' : 'empty');
+            }
         } else {
-            tileEl.classList.remove('valid');
-            tileEl.classList.add('empty');
+            validTiles[y][x] = paintMode;
+            if (paintMode) {
+                tileEl.className = 'tile valid';
+            } else {
+                tileEl.className = 'tile empty';
+            }
         }
         saveToLocalStorage();
     }
@@ -302,6 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gridW = parseInt(widthInput.value);
         gridH = parseInt(heightInput.value);
         localStorage.removeItem('foe_city_valid_tiles');
+        localStorage.removeItem('foe_city_painted_roads');
         initGrid();
         saveToLocalStorage();
     });
@@ -423,8 +509,9 @@ document.addEventListener('DOMContentLoaded', () => {
             customRoads = [];
             for (let y = 0; y < gridH; y++) {
                 for (let x = 0; x < gridW; x++) {
-                    if (!validTiles[y][x]) {
-                        customRoads.push({ x: x, y: y, type: 1 });
+                    const roadVal = paintedRoads[y][x];
+                    if (roadVal > 0) {
+                        customRoads.push({ x: x, y: y, type: roadVal });
                     }
                 }
             }
@@ -436,7 +523,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (customRoads) {
             activeGridTiles = validTiles.map(row => [...row]);
             customRoads.forEach(r => {
-                activeGridTiles[r.y][r.x] = true;
+                if (r.type === 2) {
+                    for (let dy = 0; dy < 2; dy++) {
+                        for (let dx = 0; dx < 2; dx++) {
+                            const ny = r.y + dy;
+                            const nx = r.x + dx;
+                            if (ny < gridH && nx < gridW) {
+                                activeGridTiles[ny][nx] = true;
+                            }
+                        }
+                    }
+                } else {
+                    if (r.y < gridH && r.x < gridW) {
+                        activeGridTiles[r.y][r.x] = true;
+                    }
+                }
             });
         }
 
