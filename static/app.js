@@ -412,14 +412,20 @@ document.addEventListener('DOMContentLoaded', () => {
         
         btnOptimize.textContent = "Solving...";
         let countdownInterval = null;
+        const originalTitle = document.title;
         if (btnAbort) {
             btnAbort.disabled = false;
             const endTime = Date.now() + optTime * 1000;
             btnAbort.textContent = `Abort (${optTime.toFixed(1)}s)`;
             
+            document.title = `(${Math.ceil(optTime)}s) ${originalTitle}`;
+            
             countdownInterval = setInterval(() => {
                 const remaining = Math.max(0, (endTime - Date.now()) / 1000);
                 btnAbort.textContent = `Abort (${remaining.toFixed(1)}s)`;
+                
+                document.title = `(${Math.ceil(remaining)}s) ${originalTitle}`;
+                
                 if (remaining <= 0) {
                     clearInterval(countdownInterval);
                 }
@@ -475,6 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (countdownInterval) {
                 clearInterval(countdownInterval);
             }
+            document.title = originalTitle;
         }
     });
 

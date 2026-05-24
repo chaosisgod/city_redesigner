@@ -10,22 +10,19 @@ import sys
 # Update this with the actual Local LAN IP address of your Windows 11 machine.
 # Make sure your Windows 11 machine is on the same local router/net.
 # =========================================================================
-WINDOWS_IP = "192.168.1.100"  # <-- CHANGE THIS to your Windows 11 local IP
+WINDOWS_IP = "192.168.3.230"  # <-- CHANGE THIS to your Windows 11 local IP
 WINDOWS_PORT = 8000            # Port the Windows FastAPI server runs on
 PORT = 8080                    # Port to expose publicly on your Raspberry Pi
 
 class GatewayHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
-        if self.path.startswith('/api/'):
-            self.proxy_request('POST')
-        else:
-            super().do_POST()
+        # Proxy all POST requests to the Windows backend
+        self.proxy_request('POST')
 
     def do_GET(self):
-        if self.path.startswith('/api/'):
-            self.proxy_request('GET')
-        else:
-            super().do_GET()
+        # Proxy all GET requests (including index.html and app.js) to the Windows backend.
+        # This keeps the frontend served to remote devices completely in sync with your Windows development code.
+        self.proxy_request('GET')
 
     def proxy_request(self, method):
         # Build target URL on Windows machine
