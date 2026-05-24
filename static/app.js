@@ -137,7 +137,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         annealingIterInput.addEventListener('input', saveToLocalStorage);
         optTimeInput.addEventListener('input', saveToLocalStorage);
-        townhallFixedCheckbox.addEventListener('change', saveToLocalStorage);
+        townhallFixedCheckbox.addEventListener('change', () => {
+            refreshGridVisuals();
+            saveToLocalStorage();
+        });
         
         // Initial trigger
         updateSolverParamsVisibility();
@@ -169,6 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
         renderBuildings();
+        refreshGridVisuals();
         saveToLocalStorage();
     }
 
@@ -314,6 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 tile.addEventListener('mousedown', (e) => {
                     isPainting = true;
+                    refreshGridVisuals();
                     toggleTile(x, y, tile);
                 });
                 tile.addEventListener('mouseenter', (e) => {
@@ -451,6 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         renderBuildings();
+        refreshGridVisuals();
         saveToLocalStorage();
         addBuildingForm.reset();
     });
@@ -494,6 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.removeBuildingGroup = (name) => {
         buildings = buildings.filter(b => b.name !== name);
         renderBuildings();
+        refreshGridVisuals();
         saveToLocalStorage();
     };
 
