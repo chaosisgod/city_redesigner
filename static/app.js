@@ -204,6 +204,48 @@ document.addEventListener('DOMContentLoaded', () => {
         gridEl.style.gridTemplateColumns = `repeat(${gridW}, 24px)`;
         gridEl.innerHTML = '';
         
+        // Generate X-coordinates (Top & Bottom)
+        const labelsTop = document.getElementById('grid-labels-top');
+        const labelsBottom = document.getElementById('grid-labels-bottom');
+        if (labelsTop && labelsBottom) {
+            labelsTop.style.gridTemplateColumns = `repeat(${gridW}, 24px)`;
+            labelsBottom.style.gridTemplateColumns = `repeat(${gridW}, 24px)`;
+            labelsTop.innerHTML = '';
+            labelsBottom.innerHTML = '';
+            for (let x = 0; x < gridW; x++) {
+                const labelT = document.createElement('div');
+                labelT.className = 'grid-label-x';
+                labelT.textContent = x;
+                labelsTop.appendChild(labelT);
+                
+                const labelB = document.createElement('div');
+                labelB.className = 'grid-label-x';
+                labelB.textContent = x;
+                labelsBottom.appendChild(labelB);
+            }
+        }
+        
+        // Generate Y-coordinates (Left & Right)
+        const labelsLeft = document.getElementById('grid-labels-left');
+        const labelsRight = document.getElementById('grid-labels-right');
+        if (labelsLeft && labelsRight) {
+            labelsLeft.style.gridTemplateRows = `repeat(${gridH}, 24px)`;
+            labelsRight.style.gridTemplateRows = `repeat(${gridH}, 24px)`;
+            labelsLeft.innerHTML = '';
+            labelsRight.innerHTML = '';
+            for (let y = 0; y < gridH; y++) {
+                const labelL = document.createElement('div');
+                labelL.className = 'grid-label-y';
+                labelL.textContent = y;
+                labelsLeft.appendChild(labelL);
+                
+                const labelR = document.createElement('div');
+                labelR.className = 'grid-label-y';
+                labelR.textContent = y;
+                labelsRight.appendChild(labelR);
+            }
+        }
+        
         // Restore painted map layout if dimensions match
         let savedTiles = localStorage.getItem('foe_city_valid_tiles');
         if (savedTiles) {

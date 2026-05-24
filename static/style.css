@@ -180,6 +180,52 @@ input:focus, select:focus {
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 
+.grid-wrapper {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: auto 1fr auto;
+    align-items: center;
+    justify-items: center;
+    background: var(--bg-canvas);
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.grid-labels-x {
+    display: grid;
+    gap: 1px;
+    padding: 6px 0;
+}
+
+.grid-label-x {
+    width: 24px;
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    font-family: monospace;
+    user-select: none;
+}
+
+.grid-labels-y {
+    display: grid;
+    gap: 1px;
+    padding: 0 8px;
+}
+
+.grid-label-y {
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    font-family: monospace;
+    user-select: none;
+    width: 24px;
+}
+
 .tile {
     width: 24px;
     height: 24px;
