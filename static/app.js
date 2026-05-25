@@ -29,6 +29,24 @@ document.addEventListener('DOMContentLoaded', () => {
     widthInput.value = gridW;
     heightInput.value = gridH;
 
+    function adjustTileSize() {
+        const container = document.querySelector('.canvas-container');
+        if (!container) return;
+        
+        const containerW = container.clientWidth - 80;
+        const containerH = container.clientHeight - 80;
+        
+        const totalW = gridW + 2;
+        const totalH = gridH + 2;
+        
+        let tileSize = Math.floor(Math.min(containerW / totalW, containerH / totalH));
+        tileSize = Math.max(8, Math.min(tileSize, 40));
+        
+        document.documentElement.style.setProperty('--tile-size', `${tileSize}px`);
+    }
+
+    window.addEventListener('resize', adjustTileSize);
+
     let validTiles = [];
     let paintedRoads = [];
     let isPainting = false;
@@ -243,15 +261,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function initGrid() {
-        gridEl.style.gridTemplateColumns = `repeat(${gridW}, 24px)`;
+        adjustTileSize();
+        gridEl.style.gridTemplateColumns = `repeat(${gridW}, var(--tile-size))`;
         gridEl.innerHTML = '';
         
         // Generate X-coordinates (Top & Bottom)
         const labelsTop = document.getElementById('grid-labels-top');
         const labelsBottom = document.getElementById('grid-labels-bottom');
         if (labelsTop && labelsBottom) {
-            labelsTop.style.gridTemplateColumns = `repeat(${gridW}, 24px)`;
-            labelsBottom.style.gridTemplateColumns = `repeat(${gridW}, 24px)`;
+            labelsTop.style.gridTemplateColumns = `repeat(${gridW}, var(--tile-size))`;
+            labelsBottom.style.gridTemplateColumns = `repeat(${gridW}, var(--tile-size))`;
             labelsTop.innerHTML = '';
             labelsBottom.innerHTML = '';
             for (let x = 0; x < gridW; x++) {
@@ -271,8 +290,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const labelsLeft = document.getElementById('grid-labels-left');
         const labelsRight = document.getElementById('grid-labels-right');
         if (labelsLeft && labelsRight) {
-            labelsLeft.style.gridTemplateRows = `repeat(${gridH}, 24px)`;
-            labelsRight.style.gridTemplateRows = `repeat(${gridH}, 24px)`;
+            labelsLeft.style.gridTemplateRows = `repeat(${gridH}, var(--tile-size))`;
+            labelsRight.style.gridTemplateRows = `repeat(${gridH}, var(--tile-size))`;
             labelsLeft.innerHTML = '';
             labelsRight.innerHTML = '';
             for (let y = 0; y < gridH; y++) {

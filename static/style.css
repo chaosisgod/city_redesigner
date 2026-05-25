@@ -17,6 +17,7 @@
     --tile-road-1: #a8a29e; /* Light stone color for 1x1 roads */
     --tile-road-2: #78716c; /* Darker stone color for 2x2 roads */
     --tile-building: #6366f1;
+    --tile-size: 24px;
 }
 
 * {
@@ -198,9 +199,9 @@ input:focus, select:focus {
 }
 
 .grid-label-x {
-    width: 24px;
+    width: var(--tile-size);
     text-align: center;
-    font-size: 0.7rem;
+    font-size: calc(var(--tile-size) * 0.4);
     font-weight: 700;
     color: var(--text-muted);
     font-family: monospace;
@@ -214,21 +215,21 @@ input:focus, select:focus {
 }
 
 .grid-label-y {
-    height: 24px;
+    height: var(--tile-size);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.7rem;
+    font-size: calc(var(--tile-size) * 0.4);
     font-weight: 700;
     color: var(--text-muted);
     font-family: monospace;
     user-select: none;
-    width: 24px;
+    width: var(--tile-size);
 }
 
 .tile {
-    width: 24px;
-    height: 24px;
+    width: var(--tile-size);
+    height: var(--tile-size);
     background: var(--tile-empty);
     cursor: pointer;
     transition: filter 0.1s, opacity 0.2s, box-shadow 0.2s;
