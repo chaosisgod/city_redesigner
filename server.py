@@ -18,7 +18,7 @@ async def root():
     return FileResponse(os.path.join("static", "index.html"))
 
 @app.post("/api/solve", response_model=SolveResponse)
-async def solve(request: SolveRequest):
+def solve(request: SolveRequest):
     # Ensure abort lock is cleared at start
     if os.path.exists("abort.lock"):
         try: os.remove("abort.lock")
