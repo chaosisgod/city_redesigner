@@ -11,6 +11,10 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
         import solver_evolutionary
         return solver_evolutionary.solve_layout(request)
         
+    elif request.solver_type == "neural_network":
+        import solver_nn
+        return solver_nn.solve_layout(request)
+        
     elif request.solver_type == "user_heuristic":
         import solver_heuristic
         return solver_heuristic.solve_layout(request)
