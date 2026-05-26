@@ -544,6 +544,9 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
         futures = [executor.submit(solve_single_worker, request, seed) for seed in seeds]
         for future in as_completed(futures):
             if os.path.exists("abort.lock"):
+                for p in multiprocessing.active_children():
+                    try: p.terminate()
+                    except: pass
                 break
             try:
                 res = future.result()

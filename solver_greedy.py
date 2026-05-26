@@ -493,6 +493,9 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
             
             for future in as_completed(futures):
                 if os.path.exists("abort.lock"):
+                    for p in multiprocessing.active_children():
+                        try: p.terminate()
+                        except: pass
                     break
                 try:
                     res = future.result()

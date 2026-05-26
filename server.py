@@ -25,8 +25,15 @@ async def solve(request: SolveRequest):
         except: pass
         
     try:
-        # Call the solver algorithm
-        result = solve_layout(request)
+        try:
+            # Call the solver algorithm
+            result = solve_layout(request)
+        except Exception as e:
+            if os.path.exists("abort.lock"):
+                from fastapi import HTTPException
+                raise HTTPException(status_code=400, detail="Optimization aborted by user.")
+            raise e
+            
         if os.path.exists("abort.lock"):
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="Optimization aborted by user.")
@@ -49,6 +56,15 @@ async def solve(request: SolveRequest):
 async def abort_solve():
     with open("abort.lock", "w") as f:
         f.write("abort requested")
+        
+    # Instantly terminate all active solver subprocesses to free CPU and prevent hangs
+    import multiprocessing
+    for p in multiprocessing.active_children():
+        try:
+            p.terminate()
+        except:
+            pass
+            
     return {"status": "abort requested"}
 
 @app.get("/api/catalog", response_model=List[CatalogBuilding])
