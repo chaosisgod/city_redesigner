@@ -8,13 +8,29 @@ class PolicyNetwork:
         if weights is not None:
             self.W1, self.b1, self.W2, self.b2, self.W3, self.b3 = weights
         else:
-            # Gaussian initialization with small standard deviation
-            self.W1 = np.random.randn(8, 16) * 0.2
+            # Gaussian initialization with a packing heuristic prior
+            self.W1 = np.random.randn(8, 16) * 0.1
             self.b1 = np.zeros(16)
-            self.W2 = np.random.randn(16, 8) * 0.2
+            # Column 0: prefer close to townhall (dist_th is index 0)
+            self.W1[0, 0] = -1.0
+            # Column 1: prefer close to border X (border_x is index 1)
+            self.W1[1, 1] = -1.5
+            # Column 2: prefer close to border Y (border_y is index 2)
+            self.W1[2, 2] = -1.5
+            # Column 3: prefer high occupancy ratio (occ_ratio is index 3)
+            self.W1[3, 3] = 2.5
+            
+            self.W2 = np.random.randn(16, 8) * 0.1
             self.b2 = np.zeros(8)
-            self.W3 = np.random.randn(8, 1) * 0.2
+            # Combine the packing features into the first output feature of layer 2
+            self.W2[0, 0] = 1.0
+            self.W2[1, 0] = 1.0
+            self.W2[2, 0] = 1.0
+            self.W2[3, 0] = 1.5
+            
+            self.W3 = np.random.randn(8, 1) * 0.1
             self.b3 = np.zeros(1)
+            self.W3[0, 0] = 2.0
             
     def forward(self, X):
         # Vectorized forward pass for N candidate positions
@@ -69,8 +85,13 @@ def run_constructive_placement(network, request):
     if hub:
         buildings_orig.remove(hub)
         
-    # Pre-occupied matrix
-    occupied = [[not valid_tiles[y][x] for x in range(grid_w)] for y in range(grid_h)]
+    def is_tile_valid(x, y):
+        if x < 0 or y < 0 or x >= grid_w or y >= grid_h:
+            return False
+        return valid_tiles[y][x]
+
+    # Pre-occupied matrix base
+    occupied_base = [[not valid_tiles[y][x] for x in range(grid_w)] for y in range(grid_h)]
     
     # Place Townhall
     hub_x, hub_y = 0, 0
@@ -87,7 +108,7 @@ def run_constructive_placement(network, request):
                 return False
             for dy in range(ch):
                 for dx in range(cw):
-                    if occupied[cy+dy][cx+dx]:
+                    if occupied_base[cy+dy][cx+dx]:
                         return False
             return True
             
@@ -107,10 +128,10 @@ def run_constructive_placement(network, request):
                 # Absolute failure to place Townhall
                 return None
                 
-        # Mark Townhall occupied
+        # Mark Townhall occupied in occupied_base
         for dy in range(hub.height):
             for dx in range(hub.width):
-                occupied[hub_y+dy][hub_x+dx] = True
+                occupied_base[hub_y+dy][hub_x+dx] = True
 
     hub_cx = hub_x + (hub.width / 2.0) if hub else grid_w / 2.0
     hub_cy = hub_y + (hub.height / 2.0) if hub else grid_h / 2.0
@@ -119,6 +140,165 @@ def run_constructive_placement(network, request):
         for dy in range(hub.height):
             for dx in range(hub.width):
                 hub_tiles.add((hub_x + dx, hub_y + dy))
+
+    # Pre-generate road backbone
+    init_roads = [[0 for _ in range(grid_w)] for _ in range(grid_h)]
+    init_occupied = [[not valid_tiles[y][x] for x in range(grid_w)] for y in range(grid_h)]
+
+    # Seed the hub / Townhall tiles in both roads and occupied grids
+    for tx, ty in hub_tiles:
+        if 0 <= tx < grid_w and 0 <= ty < grid_h:
+            init_occupied[ty][tx] = True
+            init_roads[ty][tx] = 3
+
+    backbone = request.backbone_type or "none"
+    
+    if backbone != "none":
+        max_road_req = 1
+        if any(b.road_type == 2 for b in buildings_orig):
+            max_road_req = 2
+            
+        if backbone == "center_spine":
+            spine_y = grid_h // 2
+            for x in range(grid_w):
+                if is_tile_valid(x, spine_y):
+                    init_roads[spine_y][x] = max(init_roads[spine_y][x], max_road_req)
+                    init_occupied[spine_y][x] = True
+                    if max_road_req == 2 and spine_y + 1 < grid_h and is_tile_valid(x, spine_y + 1):
+                        init_roads[spine_y + 1][x] = max(init_roads[spine_y + 1][x], 2)
+                        init_occupied[spine_y + 1][x] = True
+                        
+            min_y = min(hub_y, spine_y)
+            max_y = max(hub_y + hub.height - 1, spine_y)
+            conn_x = hub_x + hub.width // 2
+            for y in range(min_y, max_y + 1):
+                if is_tile_valid(conn_x, y):
+                    init_roads[y][conn_x] = max(init_roads[y][conn_x], max_road_req)
+                    init_occupied[y][conn_x] = True
+
+        elif backbone == "center_cross":
+            spine_y = grid_h // 2
+            spine_x = grid_w // 2
+            
+            # Horizontal Spine
+            for x in range(grid_w):
+                if is_tile_valid(x, spine_y):
+                    init_roads[spine_y][x] = max(init_roads[spine_y][x], max_road_req)
+                    init_occupied[spine_y][x] = True
+                    if max_road_req == 2 and spine_y + 1 < grid_h and is_tile_valid(x, spine_y + 1):
+                        init_roads[spine_y + 1][x] = max(init_roads[spine_y + 1][x], 2)
+                        init_occupied[spine_y + 1][x] = True
+                        
+            # Vertical Spine
+            for y in range(grid_h):
+                if is_tile_valid(spine_x, y):
+                    init_roads[y][spine_x] = max(init_roads[y][spine_x], max_road_req)
+                    init_occupied[y][spine_x] = True
+                    if max_road_req == 2 and spine_x + 1 < grid_w and is_tile_valid(spine_x + 1, y):
+                        init_roads[y][spine_x + 1] = max(init_roads[y][spine_x + 1], 2)
+                        init_occupied[y][spine_x + 1] = True
+                        
+            # Connect Hub to horizontal & vertical cross-spines
+            min_y = min(hub_y, spine_y)
+            max_y = max(hub_y + hub.height - 1, spine_y)
+            conn_x = hub_x + hub.width // 2
+            for y in range(min_y, max_y + 1):
+                if is_tile_valid(conn_x, y):
+                    init_roads[y][conn_x] = max(init_roads[y][conn_x], max_road_req)
+                    init_occupied[y][conn_x] = True
+                    
+            min_x = min(hub_x, spine_x)
+            max_x = max(hub_x + hub.width - 1, spine_x)
+            conn_y = hub_y + hub.height // 2
+            for x in range(min_x, max_x + 1):
+                if is_tile_valid(x, conn_y):
+                    init_roads[conn_y][x] = max(init_roads[conn_y][x], max_road_req)
+                    init_occupied[conn_y][x] = True
+
+        elif backbone == "grid":
+            lanes = [y for y in range(2, grid_h, 5)]
+            for lane_y in lanes:
+                for x in range(grid_w):
+                    if is_tile_valid(x, lane_y):
+                        init_roads[lane_y][x] = max(init_roads[lane_y][x], max_road_req)
+                        init_occupied[lane_y][x] = True
+                        if max_road_req == 2 and lane_y + 1 < grid_h and is_tile_valid(x, lane_y + 1):
+                            init_roads[lane_y + 1][x] = max(init_roads[lane_y + 1][x], 2)
+                            init_occupied[lane_y + 1][x] = True
+                            
+            conn_x = hub_x + hub.width // 2
+            for y in range(grid_h):
+                if is_tile_valid(conn_x, y):
+                    init_roads[y][conn_x] = max(init_roads[y][conn_x], max_road_req)
+                    init_occupied[y][conn_x] = True
+
+        elif backbone == "perimeter":
+            for y in range(grid_h):
+                for x in range(grid_w):
+                    if is_tile_valid(x, y):
+                        is_border = False
+                        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                            if not is_tile_valid(x + dx, y + dy):
+                                is_border = True
+                                break
+                        if is_border:
+                            init_roads[y][x] = max(init_roads[y][x], max_road_req)
+                            init_occupied[y][x] = True
+                            
+            conn_x = hub_x + hub.width // 2
+            for y in range(grid_h):
+                if is_tile_valid(conn_x, y):
+                    init_roads[y][conn_x] = max(init_roads[y][conn_x], max_road_req)
+                    init_occupied[y][conn_x] = True
+
+        elif backbone == "custom" and request.custom_roads:
+            for pr in request.custom_roads:
+                if pr.type == 2:
+                    for dy in range(2):
+                        for dx in range(2):
+                            rx, ry = pr.x + dx, pr.y + dy
+                            if 0 <= rx < grid_w and 0 <= ry < grid_h:
+                                init_roads[ry][rx] = max(init_roads[ry][rx], 2)
+                                init_occupied[ry][rx] = True
+                else:
+                    if 0 <= pr.x < grid_w and 0 <= pr.y < grid_h:
+                        init_roads[pr.y][pr.x] = max(init_roads[pr.y][pr.x], 1)
+                        init_occupied[pr.y][pr.x] = True
+
+        # Pre-placement Backbone Pruning: Ensure only fully connected road segments are kept
+        connected_backbone = set()
+        queue = []
+        visited = {}
+        for th_tx, th_ty in hub_tiles:
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = th_tx + dx, th_ty + dy
+                if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                    if init_roads[ny][nx] > 0 and (nx, ny) not in visited:
+                        visited[(nx, ny)] = None
+                        queue.append((nx, ny))
+                        
+        head = 0
+        while head < len(queue):
+            cx, cy = queue[head]
+            head += 1
+            connected_backbone.add((cx, cy))
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                    if init_roads[ny][nx] > 0 and (nx, ny) not in visited:
+                        visited[(nx, ny)] = (cx, cy)
+                        queue.append((nx, ny))
+                        
+        # Discard any disconnected backbone tiles and free their space for building placement
+        for y in range(grid_h):
+            for x in range(grid_w):
+                if (x, y) not in hub_tiles:
+                    if init_roads[y][x] > 0 and (x, y) not in connected_backbone:
+                        init_roads[y][x] = 0
+                        init_occupied[y][x] = not valid_tiles[y][x]
+
+    # Initialize constructive placement occupied map using the generated init_occupied
+    occupied = [row[:] for row in init_occupied]
 
     # Place other buildings constructively
     # Sort buildings: first those requiring 2x2 roads, then 1x1 roads, then roadless. Within groups, sort by area descending.
@@ -161,13 +341,8 @@ def run_constructive_placement(network, request):
                 occupied[best_y+dy][best_x+dx] = True
 
     # ------------------ BFS Road Routing and Scoring ------------------
-    # Re-initialize occupied matrix starting with Townhall + placed buildings
-    eval_occupied = [[not valid_tiles[y][x] for x in range(grid_w)] for y in range(grid_h)]
-    if hub:
-        for dy in range(hub.height):
-            for dx in range(hub.width):
-                eval_occupied[hub_y+dy][hub_x+dx] = True
-                
+    # Re-initialize occupied matrix starting with init_occupied + placed buildings
+    eval_occupied = [row[:] for row in init_occupied]
     final_placed_buildings = []
     if hub:
         final_placed_buildings.append(PlacedBuilding(building_id=hub.id, x=hub_x, y=hub_y))
@@ -180,7 +355,7 @@ def run_constructive_placement(network, request):
                     eval_occupied[by+dy][bx+dx] = True
             final_placed_buildings.append(PlacedBuilding(building_id=b.id, x=bx, y=by))
 
-    roads = [[0 for _ in range(grid_w)] for _ in range(grid_h)]
+    roads = [row[:] for row in init_roads]
     
     # Pathfinding routing helper
     def find_shortest_road_path(start_tiles, req_type):
