@@ -73,8 +73,8 @@ if __name__ == '__main__':
     print("Press CTRL+C to stop the gateway.")
     
     # Allow address reuse to avoid port blockages on restarts
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("0.0.0.0", PORT), GatewayHandler) as httpd:
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    with socketserver.ThreadingTCPServer(("0.0.0.0", PORT), GatewayHandler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
