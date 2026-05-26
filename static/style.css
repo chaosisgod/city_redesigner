@@ -167,7 +167,7 @@ input:focus, select:focus {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    justify-content: center;
+    justify-content: safe center;
     align-items: center;
     overflow: auto;
     padding: 40px;

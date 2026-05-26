@@ -33,8 +33,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.querySelector('.canvas-container');
         if (!container) return;
         
-        const containerW = container.clientWidth - 80;
-        const containerH = container.clientHeight - 80;
+        // Measure other visual elements inside the canvas container to prevent grid overflow
+        const banner = document.getElementById('status-banner');
+        const dock = document.getElementById('unplaced-dock');
+        
+        let nonGridHeight = 110; // Top/bottom container padding + gap margins
+        
+        if (banner && banner.style.display !== 'none' && banner.innerHTML !== '') {
+            nonGridHeight += banner.offsetHeight + 20; // height + gap
+        }
+        if (dock) {
+            nonGridHeight += dock.offsetHeight + 20; // height + gap
+        }
+        
+        const containerW = container.clientWidth - 80; // 40px left/right padding
+        const containerH = container.clientHeight - nonGridHeight;
         
         const totalW = gridW + 2;
         const totalH = gridH + 2;
@@ -586,6 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function refreshGridVisuals() {
+        adjustTileSize(); // Dynamic tile scaling on every visual update
         const isCustomRoadsActive = (solverSelect.value === 'backbone' || solverSelect.value === 'constraint_programming' || solverSelect.value === 'simulated_annealing' || solverSelect.value === 'evolutionary' || solverSelect.value === 'user_heuristic' || solverSelect.value === 'neural_network') && backboneSelect.value === 'custom';
         const tiles = gridEl.children;
         if (!tiles || tiles.length === 0) return;
