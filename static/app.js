@@ -559,6 +559,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             } else {
                                 placedBuildings.push({ building_id: draggedPlacementId, x: bx, y: by });
                             }
+                            
+                            // Remove any overlapping roads
+                            placedRoads = placedRoads.filter(r => {
+                                const rx1 = r.x;
+                                const ry1 = r.y;
+                                const rx2 = r.x + (r.type === 2 ? 2 : 1);
+                                const ry2 = r.y + (r.type === 2 ? 2 : 1);
+                                const bx2 = bx + dragWidth;
+                                const by2 = by + dragHeight;
+                                const overlaps = rx1 < bx2 && rx2 > bx && ry1 < by2 && ry2 > by;
+                                return !overlaps;
+                            });
                         } else {
                             // If invalid and already placed, restore original
                             // If from dock, it doesn't get pushed (reverts to dock)
@@ -1159,6 +1171,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         placedBuildings.push({ building_id: b.id, x: spawnX, y: spawnY });
+        
+        // Remove any overlapping roads
+        placedRoads = placedRoads.filter(r => {
+            const rx1 = r.x;
+            const ry1 = r.y;
+            const rx2 = r.x + (r.type === 2 ? 2 : 1);
+            const ry2 = r.y + (r.type === 2 ? 2 : 1);
+            const bx2 = spawnX + b.width;
+            const by2 = spawnY + b.height;
+            const overlaps = rx1 < bx2 && rx2 > spawnX && ry1 < by2 && ry2 > spawnY;
+            return !overlaps;
+        });
+
         saveToLocalStorage();
         refreshGridVisuals();
         renderUnplacedDock();
