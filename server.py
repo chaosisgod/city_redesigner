@@ -40,10 +40,6 @@ def solve(request: SolveRequest):
         if result is None:
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="Solver failed to produce a layout.")
-            
-        if len(result.placed_buildings) < len(request.buildings):
-            from fastapi import HTTPException
-            raise HTTPException(status_code=400, detail=f"Optimization failed: Only {len(result.placed_buildings)} out of {len(request.buildings)} buildings could be placed and connected.")
     finally:
         # Clear abort lock at end
         if os.path.exists("abort.lock"):
