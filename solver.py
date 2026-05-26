@@ -7,6 +7,10 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
         import solver_annealing
         return solver_annealing.solve_layout(request)
         
+    elif request.solver_type == "evolutionary":
+        import solver_evolutionary
+        return solver_evolutionary.solve_layout(request)
+        
     elif request.solver_type == "backbone":
         import solver_backbone
         return solver_backbone.solve_layout(request)
