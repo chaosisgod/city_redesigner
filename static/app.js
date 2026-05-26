@@ -47,6 +47,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('resize', adjustTileSize);
 
+    function showStatus(message, type = 'info', duration = null) {
+        const banner = document.getElementById('status-banner');
+        if (!banner) return;
+        banner.className = '';
+        banner.classList.add(type);
+        banner.innerHTML = message;
+        banner.style.display = 'block';
+        
+        if (duration) {
+            setTimeout(() => {
+                if (banner.innerHTML === message) {
+                    banner.style.display = 'none';
+                }
+            }, duration);
+        }
+    }
+    
+    function hideStatus() {
+        const banner = document.getElementById('status-banner');
+        if (banner) {
+            banner.style.display = 'none';
+        }
+    }
+
     let validTiles = [];
     let paintedRoads = [];
     let isPainting = false;
@@ -698,6 +722,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 100);
         }
         try {
+            showStatus("Optimizing layout... Please wait.", "info");
             const res = await fetch('/api/solve', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -709,8 +734,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('debug-output').value = data.detail || JSON.stringify(data, null, 2);
                 if (data.detail && data.detail.includes("aborted")) {
                     alert("Optimization was aborted successfully.");
+                    showStatus("Optimization was aborted successfully.", "warning", 5000);
                 } else {
                     alert("Error solving layout: " + (data.detail || "Unknown error"));
+                    showStatus("Optimization Failed: " + (data.detail || "Unknown error"), "error");
                 }
                 return;
             }
@@ -734,9 +761,17 @@ document.addEventListener('DOMContentLoaded', () => {
             
             document.getElementById('debug-output').value = JSON.stringify(data, null, 2);
             drawResult(data);
+            
+            // Globally check building placement count
+            if (data.placed_buildings.length < buildings.length) {
+                showStatus(`Optimization Failed: Only ${data.placed_buildings.length} out of ${buildings.length} buildings are placed on the map.`, "error");
+            } else {
+                showStatus(`Optimization Succeeded: All ${buildings.length} buildings are successfully placed and connected!`, "success", 8000);
+            }
         } catch (e) {
             console.error(e);
             alert("Error solving layout");
+            showStatus("Optimization Failed: Error solving layout.", "error");
             document.getElementById('debug-output').value = "Error: " + e.message;
         } finally {
             btnOptimize.textContent = "Optimize Layout";
