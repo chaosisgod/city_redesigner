@@ -82,6 +82,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let rootHubX = null;
     let rootHubY = null;
 
+    // Drag-and-drop layout editor variables
+    let isDraggingBuilding = false;
+    let draggedBuilding = null;
+    let draggedPlacementId = null;
+    let dragWidth = 0;
+    let dragHeight = 0;
+    let dragStartGridX = 0;
+    let dragStartGridY = 0;
+
     function initHubPosition() {
         const rootW = buildings[0].width;
         const rootH = buildings[0].height;
@@ -100,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Restore buildings inventory from localStorage
+    // Restore buildings inventory and manual layouts from localStorage
     const savedBuildings = localStorage.getItem('foe_city_buildings');
     let buildings = savedBuildings ? JSON.parse(savedBuildings) : [
         {
@@ -112,6 +121,12 @@ document.addEventListener('DOMContentLoaded', () => {
             color: '#eab308'
         }
     ];
+
+    const savedPlacedBuildings = localStorage.getItem('foe_city_placed_buildings');
+    let placedBuildings = savedPlacedBuildings ? JSON.parse(savedPlacedBuildings) : [];
+
+    const savedPlacedRoads = localStorage.getItem('foe_city_placed_roads_result');
+    let placedRoads = savedPlacedRoads ? JSON.parse(savedPlacedRoads) : [];
     
     const savedCounter = localStorage.getItem('foe_city_building_counter');
     let buildingIdCounter = savedCounter ? parseInt(savedCounter) : 1;
@@ -149,6 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('foe_city_grid_w', gridW);
         localStorage.setItem('foe_city_grid_h', gridH);
         localStorage.setItem('foe_city_buildings', JSON.stringify(buildings));
+        localStorage.setItem('foe_city_placed_buildings', JSON.stringify(placedBuildings));
+        localStorage.setItem('foe_city_placed_roads_result', JSON.stringify(placedRoads));
         localStorage.setItem('foe_city_building_counter', buildingIdCounter);
         localStorage.setItem('foe_city_valid_tiles', JSON.stringify(validTiles));
         localStorage.setItem('foe_city_painted_roads', JSON.stringify(paintedRoads));
@@ -383,11 +400,33 @@ document.addEventListener('DOMContentLoaded', () => {
                         dragOffsetX = x - rootHubX;
                         dragOffsetY = y - rootHubY;
                     } else {
-                        isPainting = true;
-                        refreshGridVisuals();
-                        toggleTile(x, y, tile);
+                        // Check if user clicked on an already placed building (excluding Townhall)
+                        const clickedPB = placedBuildings.find(pb => {
+                            const b = buildings.find(z => z.id === pb.building_id);
+                            if (!b) return false;
+                            return x >= pb.x && x < pb.x + b.width && y >= pb.y && y < pb.y + b.height;
+                        });
+                        
+                        if (clickedPB) {
+                            const b = buildings.find(z => z.id === clickedPB.building_id);
+                            isDraggingBuilding = true;
+                            draggedBuilding = b;
+                            draggedPlacementId = b.id;
+                            dragWidth = b.width;
+                            dragHeight = b.height;
+                            dragStartGridX = clickedPB.x;
+                            dragStartGridY = clickedPB.y;
+                            dragOffsetX = x - clickedPB.x;
+                            dragOffsetY = y - clickedPB.y;
+                        } else {
+                            // Otherwise, normal paint mode
+                            isPainting = true;
+                            refreshGridVisuals();
+                            toggleTile(x, y, tile);
+                        }
                     }
                 });
+
                 tile.addEventListener('mouseenter', (e) => {
                     if (isDraggingHub) {
                         const rootW = buildings[0].width;
@@ -403,8 +442,140 @@ document.addEventListener('DOMContentLoaded', () => {
                                 refreshGridVisuals();
                             }
                         }
+                    } else if (isDraggingBuilding) {
+                        const bx = x - dragOffsetX;
+                        const by = y - dragOffsetY;
+                        
+                        // Check if valid footprint
+                        let isValidFootprint = true;
+                        const rootW = buildings[0].width;
+                        const rootH = buildings[0].height;
+                        
+                        if (bx < 0 || bx + dragWidth > gridW || by < 0 || by + dragHeight > gridH) {
+                            isValidFootprint = false;
+                        } else {
+                            for (let dy = 0; dy < dragHeight; dy++) {
+                                for (let dx = 0; dx < dragWidth; dx++) {
+                                    const nx = bx + dx;
+                                    const ny = by + dy;
+                                    
+                                    if (!validTiles[ny][nx]) {
+                                        isValidFootprint = false;
+                                        break;
+                                    }
+                                    
+                                    if (nx >= rootHubX && nx < rootHubX + rootW && ny >= rootHubY && ny < rootHubY + rootH) {
+                                        isValidFootprint = false;
+                                        break;
+                                    }
+                                    
+                                    const overlapOther = placedBuildings.some(pb => {
+                                        if (pb.building_id === draggedPlacementId) return false;
+                                        const ob = buildings.find(z => z.id === pb.building_id);
+                                        if (!ob) return false;
+                                        return nx >= pb.x && nx < pb.x + ob.width && ny >= pb.y && ny < pb.y + ob.height;
+                                    });
+                                    if (overlapOther) {
+                                        isValidFootprint = false;
+                                        break;
+                                    }
+                                }
+                                if (!isValidFootprint) break;
+                            }
+                        }
+                        
+                        // Clear previous drag glow classes
+                        Array.from(gridEl.children).forEach(tileEl => {
+                            tileEl.classList.remove('drag-glow-valid', 'drag-glow-invalid');
+                        });
+                        
+                        // Apply glow classes to candidate tiles
+                        for (let dy = 0; dy < dragHeight; dy++) {
+                            for (let dx = 0; dx < dragWidth; dx++) {
+                                const nx = bx + dx;
+                                const ny = by + dy;
+                                if (nx >= 0 && nx < gridW && ny >= 0 && ny < gridH) {
+                                    const idx = ny * gridW + nx;
+                                    const tileEl = gridEl.children[idx];
+                                    if (tileEl) {
+                                        tileEl.classList.add(isValidFootprint ? 'drag-glow-valid' : 'drag-glow-invalid');
+                                    }
+                                }
+                            }
+                        }
                     } else if (isPainting) {
                         toggleTile(x, y, tile);
+                    }
+                });
+
+                tile.addEventListener('mouseup', (e) => {
+                    if (isDraggingBuilding) {
+                        const bx = x - dragOffsetX;
+                        const by = y - dragOffsetY;
+                        
+                        let isValidFootprint = true;
+                        const rootW = buildings[0].width;
+                        const rootH = buildings[0].height;
+                        
+                        if (bx < 0 || bx + dragWidth > gridW || by < 0 || by + dragHeight > gridH) {
+                            isValidFootprint = false;
+                        } else {
+                            for (let dy = 0; dy < dragHeight; dy++) {
+                                for (let dx = 0; dx < dragWidth; dx++) {
+                                    const nx = bx + dx;
+                                    const ny = by + dy;
+                                    if (!validTiles[ny][nx]) { isValidFootprint = false; break; }
+                                    if (nx >= rootHubX && nx < rootHubX + rootW && ny >= rootHubY && ny < rootHubY + rootH) { isValidFootprint = false; break; }
+                                    const overlapOther = placedBuildings.some(pb => {
+                                        if (pb.building_id === draggedPlacementId) return false;
+                                        const ob = buildings.find(z => z.id === pb.building_id);
+                                        if (!ob) return false;
+                                        return nx >= pb.x && nx < pb.x + ob.width && ny >= pb.y && ny < pb.y + ob.height;
+                                    });
+                                    if (overlapOther) { isValidFootprint = false; break; }
+                                }
+                                if (!isValidFootprint) break;
+                            }
+                        }
+                        
+                        if (isValidFootprint) {
+                            let pb = placedBuildings.find(z => z.building_id === draggedPlacementId);
+                            if (pb) {
+                                pb.x = bx;
+                                pb.y = by;
+                            } else {
+                                placedBuildings.push({ building_id: draggedPlacementId, x: bx, y: by });
+                            }
+                        } else {
+                            // If invalid and already placed, restore original
+                            // If from dock, it doesn't get pushed (reverts to dock)
+                        }
+                        
+                        isDraggingBuilding = false;
+                        saveToLocalStorage();
+                        refreshGridVisuals();
+                        renderUnplacedDock();
+                    }
+                });
+
+                tile.addEventListener('contextmenu', (e) => {
+                    e.preventDefault(); // prevent native menu
+                    const rootW = buildings[0].width;
+                    const rootH = buildings[0].height;
+                    const isWithinRootHub = x >= rootHubX && x < rootHubX + rootW && y >= rootHubY && y < rootHubY + rootH;
+                    if (isWithinRootHub) return; // Townhall cannot be deleted this way
+                    
+                    const clickedPBIndex = placedBuildings.findIndex(pb => {
+                        const b = buildings.find(z => z.id === pb.building_id);
+                        if (!b) return false;
+                        return x >= pb.x && x < pb.x + b.width && y >= pb.y && y < pb.y + b.height;
+                    });
+                    
+                    if (clickedPBIndex !== -1) {
+                        placedBuildings.splice(clickedPBIndex, 1);
+                        saveToLocalStorage();
+                        refreshGridVisuals();
+                        renderUnplacedDock();
                     }
                 });
                 
@@ -442,6 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (hubHasOverlaps) break;
         }
 
+        // 1. Reset all tiles to their base valid/empty/painted-road styles
         for (let i = 0; i < tiles.length; i++) {
             const tile = tiles[i];
             const x = parseInt(tile.dataset.x);
@@ -455,36 +627,86 @@ document.addEventListener('DOMContentLoaded', () => {
             tile.style.borderRight = '';
             delete tile.dataset.name;
 
-            const isWithinRootHub = x >= rootHubX && x < rootHubX + rootW && y >= rootHubY && y < rootHubY + rootH;
+            const isValid = validTiles[y][x];
+            const roadVal = paintedRoads[y][x];
             
-            if (isWithinRootHub) {
-                tile.className = 'tile th';
-                tile.dataset.name = buildings[0].name;
-                
-                const dx = x - rootHubX;
-                const dy = y - rootHubY;
-                const borderStyle = hubHasOverlaps ? '2px solid var(--danger)' : '2px solid var(--tile-th)';
-                
-                tile.style.borderTop = dy === 0 ? borderStyle : '';
-                tile.style.borderBottom = dy === rootH - 1 ? borderStyle : '';
-                tile.style.borderLeft = dx === 0 ? borderStyle : '';
-                tile.style.borderRight = dx === rootW - 1 ? borderStyle : '';
+            let classNames = ['tile'];
+            if (isCustomRoadsActive && roadVal === 1) {
+                classNames.push('road-painted-1');
+            } else if (isCustomRoadsActive && roadVal === 2) {
+                classNames.push('road-painted-2');
             } else {
-                const isValid = validTiles[y][x];
-                const roadVal = paintedRoads[y][x];
-                
-                let classNames = ['tile'];
-                if (isCustomRoadsActive && roadVal === 1) {
-                    classNames.push('road-painted-1');
-                } else if (isCustomRoadsActive && roadVal === 2) {
-                    classNames.push('road-painted-2');
-                } else {
-                    classNames.push(isValid ? 'valid' : 'empty');
+                classNames.push(isValid ? 'valid' : 'empty');
+            }
+            
+            tile.className = classNames.join(' ');
+        }
+
+        // 2. Draw placed roads
+        placedRoads.forEach(r => {
+            if (r.type === 2) {
+                for (let dy = 0; dy < 2; dy++) {
+                    for (let dx = 0; dx < 2; dx++) {
+                        const idx = (r.y + dy) * gridW + (r.x + dx);
+                        if(tiles[idx]) {
+                            tiles[idx].className = 'tile road2';
+                            tiles[idx].dataset.name = '2x2 Road';
+                        }
+                    }
                 }
-                
-                tile.className = classNames.join(' ');
+            } else {
+                const idx = r.y * gridW + r.x;
+                if(tiles[idx]) {
+                    tiles[idx].className = 'tile road1';
+                    tiles[idx].dataset.name = '1x1 Road';
+                }
+            }
+        });
+
+        // 3. Draw Townhall / Embassy
+        for (let dy = 0; dy < rootH; dy++) {
+            for (let dx = 0; dx < rootW; dx++) {
+                const tx = rootHubX + dx;
+                const ty = rootHubY + dy;
+                const idx = ty * gridW + tx;
+                if (tiles[idx]) {
+                    tiles[idx].className = 'tile th';
+                    tiles[idx].dataset.name = buildings[0].name;
+                    
+                    const borderStyle = hubHasOverlaps ? '2px solid var(--danger)' : '2px solid var(--tile-th)';
+                    
+                    tiles[idx].style.borderTop = dy === 0 ? borderStyle : '';
+                    tiles[idx].style.borderBottom = dy === rootH - 1 ? borderStyle : '';
+                    tiles[idx].style.borderLeft = dx === 0 ? borderStyle : '';
+                    tiles[idx].style.borderRight = dx === rootW - 1 ? borderStyle : '';
+                }
             }
         }
+
+        // 4. Draw other placed buildings
+        placedBuildings.forEach(pb => {
+            const b = buildings.find(x => x.id === pb.building_id);
+            if(!b) return;
+            const isTH = b.name.toLowerCase().includes('townhall') || b.name.toLowerCase().includes('embassy');
+            if (isTH) return; // Placed hub drawn separately above
+            
+            for(let dy=0; dy<b.height; dy++) {
+                for(let dx=0; dx<b.width; dx++) {
+                    const idx = (pb.y + dy) * gridW + (pb.x + dx);
+                    if(tiles[idx]) {
+                        tiles[idx].className = 'tile building';
+                        tiles[idx].style.backgroundColor = b.color;
+                        tiles[idx].dataset.name = b.name;
+                        
+                        // Draw exterior boundaries
+                        tiles[idx].style.borderTop = dy === 0 ? '2px solid white' : '';
+                        tiles[idx].style.borderBottom = dy === b.height - 1 ? '2px solid white' : '';
+                        tiles[idx].style.borderLeft = dx === 0 ? '2px solid white' : '';
+                        tiles[idx].style.borderRight = dx === b.width - 1 ? '2px solid white' : '';
+                    }
+                }
+            }
+        });
 
         const summaryDiv = document.getElementById('solver-summary-stats');
         if (summaryDiv) {
@@ -616,9 +838,14 @@ document.addEventListener('DOMContentLoaded', () => {
             li.className = 'building-item';
             li.style.borderLeft = `4px solid ${g.b.color}`;
             li.innerHTML = `
-                <span>${g.count}x ${g.b.name} (${g.b.width}x${g.b.height})</span>
+                <span style="cursor: pointer; flex: 1;" title="Click to spawn/drag this building on the map">${g.count}x ${g.b.name} (${g.b.width}x${g.b.height})</span>
                 ${(g.b.name.toLowerCase().includes('townhall') || g.b.name.toLowerCase().includes('embassy')) ? '' : `<button onclick="removeBuildingGroup('${g.b.name}')">X</button>`}
             `;
+            
+            const span = li.querySelector('span');
+            span.addEventListener('click', () => {
+                spawnBuildingFromInventory(g.b.name);
+            });
             
             li.addEventListener('mouseenter', () => {
                 gridEl.classList.add('highlighting');
@@ -638,8 +865,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.removeBuildingGroup = (name) => {
+        const removedIds = new Set(buildings.filter(b => b.name === name).map(b => b.id));
         buildings = buildings.filter(b => b.name !== name);
+        placedBuildings = placedBuildings.filter(pb => !removedIds.has(pb.building_id));
+        
         renderBuildings();
+        renderUnplacedDock();
         refreshGridVisuals();
         saveToLocalStorage();
     };
@@ -804,70 +1035,181 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function drawResult(data) {
-        // Reset grid visuals to just valid/invalid
-        const tiles = gridEl.children;
-        for(let i=0; i<tiles.length; i++) {
-            tiles[i].className = validTiles[Math.floor(i/gridW)][i%gridW] ? 'tile valid' : 'tile empty';
-            tiles[i].style.backgroundColor = '';
-            tiles[i].style.borderTop = '';
-            tiles[i].style.borderBottom = '';
-            tiles[i].style.borderLeft = '';
-            tiles[i].style.borderRight = '';
-            delete tiles[i].dataset.name;
-        }
+        placedBuildings = data.placed_buildings || [];
+        placedRoads = data.placed_roads || [];
+        saveToLocalStorage();
+        refreshGridVisuals();
+        renderUnplacedDock();
+    }
 
-        // Draw roads
-        data.placed_roads.forEach(r => {
-            if (r.type === 2) {
-                for (let dy = 0; dy < 2; dy++) {
-                    for (let dx = 0; dx < 2; dx++) {
-                        const idx = (r.y + dy) * gridW + (r.x + dx);
-                        if(tiles[idx]) {
-                            tiles[idx].className = 'tile road2';
-                            tiles[idx].dataset.name = '2x2 Road';
+    // Global document mouseup safety listener
+    document.addEventListener('mouseup', () => {
+        if (isDraggingHub) {
+            isDraggingHub = false;
+            saveToLocalStorage();
+            refreshGridVisuals();
+        }
+        if (isDraggingBuilding) {
+            // Re-render and clear glows if dropped outside the grid
+            isDraggingBuilding = false;
+            Array.from(gridEl.children).forEach(t => t.classList.remove('drag-glow-valid', 'drag-glow-invalid'));
+            refreshGridVisuals();
+            renderUnplacedDock();
+        }
+        isPainting = false;
+    });
+
+    // Rotation handler on 'R' keypress while dragging
+    window.addEventListener('keydown', (e) => {
+        if (isDraggingBuilding && (e.key === 'r' || e.key === 'R')) {
+            const b = buildings.find(x => x.id === draggedPlacementId);
+            if (b) {
+                const temp = b.width;
+                b.width = b.height;
+                b.height = temp;
+                
+                const temp2 = dragWidth;
+                dragWidth = dragHeight;
+                dragHeight = temp2;
+                
+                const temp3 = dragOffsetX;
+                dragOffsetX = dragOffsetY;
+                dragOffsetY = temp3;
+                
+                saveToLocalStorage();
+                refreshGridVisuals();
+            }
+        }
+    });
+
+    // Spawn a building constructively on first vacant spot
+    function spawnBuildingFromInventory(name) {
+        const b = buildings.find(x => x.name.toLowerCase() === name.toLowerCase() && !placedBuildings.some(pb => pb.building_id === x.id));
+        if (!b) {
+            alert(`All instances of "${name}" are already placed on the map! Add more using the form if needed.`);
+            return;
+        }
+        
+        let spawnX = 0;
+        let spawnY = 0;
+        let foundSpot = false;
+        
+        const occupied = Array(gridH).fill().map(() => Array(gridW).fill(false));
+        for (let y = 0; y < gridH; y++) {
+            for (let x = 0; x < gridW; x++) {
+                occupied[y][x] = !validTiles[y][x];
+            }
+        }
+        const rootW = buildings[0].width;
+        const rootH = buildings[0].height;
+        for (let dy = 0; dy < rootH; dy++) {
+            for (let dx = 0; dx < rootW; dx++) {
+                if (rootHubY + dy < gridH && rootHubX + dx < gridW) {
+                    occupied[rootHubY + dy][rootHubX + dx] = true;
+                }
+            }
+        }
+        placedBuildings.forEach(pb => {
+            const ob = buildings.find(x => x.id === pb.building_id);
+            if (ob) {
+                for (let dy = 0; dy < ob.height; dy++) {
+                    for (let dx = 0; dx < ob.width; dx++) {
+                        if (pb.y + dy < gridH && pb.x + dx < gridW) {
+                            occupied[pb.y + dy][pb.x + dx] = true;
                         }
                     }
                 }
-            } else {
-                const idx = r.y * gridW + r.x;
-                if(tiles[idx]) {
-                    tiles[idx].className = 'tile road1';
-                    tiles[idx].dataset.name = '1x1 Road';
-                }
             }
         });
-
-        // Draw buildings
-        data.placed_buildings.forEach(pb => {
-            const b = buildings.find(x => x.id === pb.building_id);
-            if(!b) return;
-            // if it's townhall, color differently
-            const isTH = b.name.toLowerCase().includes('townhall') || b.name.toLowerCase().includes('embassy');
-            if (isTH) {
-                rootHubX = pb.x;
-                rootHubY = pb.y;
-                saveToLocalStorage();
-            }
-            for(let dy=0; dy<b.height; dy++) {
-                for(let dx=0; dx<b.width; dx++) {
-                    const idx = (pb.y + dy) * gridW + (pb.x + dx);
-                    if(tiles[idx]) {
-                        tiles[idx].className = isTH ? 'tile th' : 'tile building';
-                        tiles[idx].style.backgroundColor = isTH ? '' : b.color;
-                        tiles[idx].dataset.name = b.name;
-                        
-                        // Draw exterior boundaries
-                        tiles[idx].style.borderTop = dy === 0 ? '2px solid white' : '';
-                        tiles[idx].style.borderBottom = dy === b.height - 1 ? '2px solid white' : '';
-                        tiles[idx].style.borderLeft = dx === 0 ? '2px solid white' : '';
-                        tiles[idx].style.borderRight = dx === b.width - 1 ? '2px solid white' : '';
+        
+        for (let y = 0; y < gridH - b.height + 1; y++) {
+            for (let x = 0; x < gridW - b.width + 1; x++) {
+                let fits = true;
+                for (let dy = 0; dy < b.height; dy++) {
+                    for (let dx = 0; dx < b.width; dx++) {
+                        if (occupied[y+dy][x+dx]) {
+                            fits = false;
+                            break;
+                        }
                     }
+                    if (!fits) break;
+                }
+                if (fits) {
+                    spawnX = x;
+                    spawnY = y;
+                    foundSpot = true;
+                    break;
                 }
             }
+            if (foundSpot) break;
+        }
+        
+        placedBuildings.push({ building_id: b.id, x: spawnX, y: spawnY });
+        saveToLocalStorage();
+        refreshGridVisuals();
+        renderUnplacedDock();
+        
+        // Drag instantly
+        isDraggingBuilding = true;
+        draggedBuilding = b;
+        draggedPlacementId = b.id;
+        dragWidth = b.width;
+        dragHeight = b.height;
+        dragStartGridX = spawnX;
+        dragStartGridY = spawnY;
+        dragOffsetX = 0;
+        dragOffsetY = 0;
+    }
+
+    // Render the horizontal tray of unplaced buildings
+    function renderUnplacedDock() {
+        const dockContainer = document.getElementById('unplaced-dock-items');
+        if (!dockContainer) return;
+        dockContainer.innerHTML = '';
+        
+        const unplaced = [];
+        buildings.forEach((b, idx) => {
+            if (idx === 0) return; // Skip Townhall
+            
+            const isPlaced = placedBuildings.some(pb => pb.building_id === b.id);
+            if (!isPlaced) {
+                unplaced.push(b);
+            }
+        });
+        
+        if (unplaced.length === 0) {
+            dockContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem; font-style: italic; width: 100%; text-align: center;">All buildings are placed on the map! Click names to spawn, drag to move, or right-click to return here.</div>';
+            return;
+        }
+        
+        unplaced.forEach(b => {
+            const card = document.createElement('div');
+            card.className = 'dock-item';
+            card.style.borderLeft = `4px solid ${b.color}`;
+            card.title = "Drag this building onto the grid";
+            card.innerHTML = `
+                <div class="dock-item-name">${b.name}</div>
+                <div class="dock-item-badge" style="background-color: ${b.color};">${b.width}x${b.height}</div>
+            `;
+            
+            card.addEventListener('mousedown', (e) => {
+                isDraggingBuilding = true;
+                draggedBuilding = b;
+                draggedPlacementId = b.id;
+                dragWidth = b.width;
+                dragHeight = b.height;
+                dragOffsetX = Math.floor(b.width / 2);
+                dragOffsetY = Math.floor(b.height / 2);
+                dragStartGridX = -1;
+                dragStartGridY = -1;
+            });
+            
+            dockContainer.appendChild(card);
         });
     }
 
     initGrid();
     fetchCatalog();
     renderBuildings();
+    renderUnplacedDock();
 });
