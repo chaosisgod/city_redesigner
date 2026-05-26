@@ -19,7 +19,7 @@ payload_base = {
     "debug": False
 }
 
-solvers = ["random_greedy", "simulated_annealing", "evolutionary", "backbone", "constraint_programming"]
+solvers = ["random_greedy", "simulated_annealing", "evolutionary", "user_heuristic", "backbone", "constraint_programming"]
 
 for solver in solvers:
     payload = payload_base.copy()
