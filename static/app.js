@@ -863,15 +863,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const li = document.createElement('li');
             li.className = 'building-item';
             li.style.borderLeft = `4px solid ${g.b.color}`;
+            
+            const isTH = g.b.name.toLowerCase().includes('townhall') || g.b.name.toLowerCase().includes('embassy');
+            
             li.innerHTML = `
                 <span style="cursor: pointer; flex: 1;" title="Click to spawn/drag this building on the map">${g.count}x ${g.b.name} (${g.b.width}x${g.b.height})</span>
-                ${(g.b.name.toLowerCase().includes('townhall') || g.b.name.toLowerCase().includes('embassy')) ? '' : `<button onclick="removeBuildingGroup('${g.b.name}')">X</button>`}
+                ${isTH ? '' : `<button class="remove-btn">X</button>`}
             `;
             
             const span = li.querySelector('span');
             span.addEventListener('click', () => {
                 spawnBuildingFromInventory(g.b.name);
             });
+            
+            if (!isTH) {
+                const removeBtn = li.querySelector('.remove-btn');
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', () => {
+                        removeBuildingGroup(g.b.name);
+                    });
+                }
+            }
             
             li.addEventListener('mouseenter', () => {
                 gridEl.classList.add('highlighting');
@@ -890,7 +902,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    window.removeBuildingGroup = (name) => {
+    function removeBuildingGroup(name) {
         const removedIds = new Set(buildings.filter(b => b.name === name).map(b => b.id));
         buildings = buildings.filter(b => b.name !== name);
         placedBuildings = placedBuildings.filter(pb => !removedIds.has(pb.building_id));
@@ -899,7 +911,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderUnplacedDock();
         refreshGridVisuals();
         saveToLocalStorage();
-    };
+    }
+    window.removeBuildingGroup = removeBuildingGroup;
 
 
 
