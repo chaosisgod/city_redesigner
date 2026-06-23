@@ -424,6 +424,9 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
     best_overall = max(population, key=lambda ind: ind[0])
     
     generation = 0
+    stagnant_generations = 0
+    patience = 8
+    
     while time.time() < end_time:
         if os.path.exists("abort.lock"):
             break
@@ -435,6 +438,13 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
         # Keep track of the absolute best
         if population[0][0] > best_overall[0]:
             best_overall = population[0]
+            stagnant_generations = 0
+        else:
+            stagnant_generations += 1
+            
+        if request.early_stopping and stagnant_generations >= patience:
+            print(f"Early stopping triggered: fitness stagnant for {stagnant_generations} generations.")
+            break
             
         next_population = []
         

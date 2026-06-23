@@ -22,6 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const townhallFixedCheckbox = document.getElementById('townhall-fixed');
     const resumeWeightsCheckbox = document.getElementById('resume-weights');
     const resumeWeightsContainer = document.getElementById('resume-weights-container');
+    const earlyStoppingCheckbox = document.getElementById('early-stopping');
+    const earlyStoppingContainer = document.getElementById('early-stopping-container');
 
     // Restore grid dimensions from localStorage
     const savedGridW = localStorage.getItem('foe_city_grid_w');
@@ -177,6 +179,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (savedResume !== null && resumeWeightsCheckbox) {
             resumeWeightsCheckbox.checked = savedResume === 'true';
         }
+        const savedEarlyStopping = localStorage.getItem('foe_city_early_stopping');
+        if (savedEarlyStopping !== null && earlyStoppingCheckbox) {
+            earlyStoppingCheckbox.checked = savedEarlyStopping === 'true';
+        }
     }
 
     function saveToLocalStorage() {
@@ -206,6 +212,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (resumeWeightsCheckbox) {
                 localStorage.setItem('foe_city_resume_weights', resumeWeightsCheckbox.checked);
             }
+            if (earlyStoppingCheckbox) {
+                localStorage.setItem('foe_city_early_stopping', earlyStoppingCheckbox.checked);
+            }
         }
     }
 
@@ -218,6 +227,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (resumeWeightsContainer) {
             resumeWeightsContainer.style.display = solver === 'neural_network' ? 'flex' : 'none';
+        }
+        if (earlyStoppingContainer) {
+            earlyStoppingContainer.style.display = (solver === 'neural_network' || solver === 'evolutionary') ? 'flex' : 'none';
         }
         
         const roadTypeContainer = document.getElementById('paint-road-type-container');
@@ -254,6 +266,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         if (resumeWeightsCheckbox) {
             resumeWeightsCheckbox.addEventListener('change', saveToLocalStorage);
+        }
+        if (earlyStoppingCheckbox) {
+            earlyStoppingCheckbox.addEventListener('change', saveToLocalStorage);
         }
         
         // Initial trigger
@@ -984,7 +999,8 @@ document.addEventListener('DOMContentLoaded', () => {
             backbone_type: backboneSelect.value,
             annealing_iterations: parseInt(annealingIterInput.value) || 1500,
             custom_roads: customRoads,
-            resume_weights: resumeWeightsCheckbox ? resumeWeightsCheckbox.checked : false
+            resume_weights: resumeWeightsCheckbox ? resumeWeightsCheckbox.checked : false,
+            early_stopping: earlyStoppingCheckbox ? earlyStoppingCheckbox.checked : false
         };
         
         btnOptimize.textContent = "Solving...";

@@ -522,6 +522,9 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
     best_score = -float('inf')
     best_network = None
     
+    stagnant_generations = 0
+    patience = 8
+    
     end_time = time.time() + request.optimization_time
     
     for gen in range(generations):
@@ -547,10 +550,18 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
         
         # Track best layout
         gen_best_idx = indices[0]
-        if fitness_scores[gen_best_idx] > best_score and layouts[gen_best_idx] is not None:
-            best_score = fitness_scores[gen_best_idx]
+        gen_best_score = fitness_scores[gen_best_idx]
+        if gen_best_score > best_score and layouts[gen_best_idx] is not None:
+            best_score = gen_best_score
             best_response = layouts[gen_best_idx]
             best_network = population[gen_best_idx]
+            stagnant_generations = 0
+        else:
+            stagnant_generations += 1
+            
+        if request.early_stopping and stagnant_generations >= patience:
+            print(f"Early stopping triggered: fitness stagnant for {stagnant_generations} generations.")
+            break
             
         # Form new population (Elitism + Selection + Mutation)
         new_population = []

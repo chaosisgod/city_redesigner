@@ -86,6 +86,10 @@
                     <input type="checkbox" id="resume-weights" style="width: auto; cursor: pointer;">
                     Warm Start AI Weights (Resume)
                 </label>
+                <label class="checkbox-label" id="early-stopping-container" style="display: none; align-items: center; gap: 8px; margin-top: 4px; font-size: 0.9rem; color: #cbd5e1; cursor: pointer;">
+                    <input type="checkbox" id="early-stopping" checked style="width: auto; cursor: pointer;">
+                    Early Stopping (On Stagnation)
+                </label>
                 <div class="optimize-container" style="display: flex; gap: 8px; width: 100%;">
                     <button id="btn-optimize" class="btn primary" style="flex: 2;">Optimize Layout</button>
                     <button id="btn-abort" class="btn danger" disabled style="flex: 1; background-color: var(--danger);">Abort</button>
