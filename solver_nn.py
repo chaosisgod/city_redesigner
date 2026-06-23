@@ -488,6 +488,7 @@ def run_constructive_placement(network, request):
     return response
 
 def solve_layout(request: SolveRequest) -> SolveResponse:
+    import json
     # Setup neuro-evolution parameters
     pop_size = 20
     generations = 30
@@ -495,10 +496,31 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
     mutation_scale = 0.15
     elitism = 4
     
-    # Initialize random population of network weights
-    population = [PolicyNetwork() for _ in range(pop_size)]
+    # Initialize random population of network weights or warm-start from checkpoint
+    best_weights = None
+    if getattr(request, "resume_weights", False) and os.path.exists("best_nn_weights.json"):
+        try:
+            with open("best_nn_weights.json", "r") as f:
+                serialized = json.load(f)
+                best_weights = tuple(np.array(w) for w in serialized)
+            print("Successfully loaded best neural network weights to warm start the population!")
+        except Exception as e:
+            print(f"Error loading best_nn_weights.json: {e}")
+
+    population = []
+    if best_weights is not None:
+        # Seed 5 exact copies of the best network, and 15 mutated versions of it
+        for _ in range(5):
+            population.append(PolicyNetwork(weights=best_weights))
+        for _ in range(pop_size - 5):
+            mutated = mutate(best_weights, rate=0.3, scale=0.1)
+            population.append(PolicyNetwork(weights=mutated))
+    else:
+        population = [PolicyNetwork() for _ in range(pop_size)]
+
     best_response = None
     best_score = -float('inf')
+    best_network = None
     
     end_time = time.time() + request.optimization_time
     
@@ -528,6 +550,7 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
         if fitness_scores[gen_best_idx] > best_score and layouts[gen_best_idx] is not None:
             best_score = fitness_scores[gen_best_idx]
             best_response = layouts[gen_best_idx]
+            best_network = population[gen_best_idx]
             
         # Form new population (Elitism + Selection + Mutation)
         new_population = []
@@ -554,6 +577,17 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
             new_population.append(PolicyNetwork(weights=mutated_weights))
             
         population = new_population
+
+    # Save the best network checkpoint weights at the end of the run
+    if best_network is not None:
+        try:
+            weights = best_network.get_weights()
+            serialized = [w.tolist() for w in weights]
+            with open("best_nn_weights.json", "w") as f:
+                json.dump(serialized, f)
+            print("Successfully saved best neural network weights checkpoint to best_nn_weights.json")
+        except Exception as e:
+            print(f"Error saving best_nn_weights.json: {e}")
 
     return best_response
 

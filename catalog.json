@@ -268,5 +268,71 @@
         "width": 7,
         "height": 4,
         "road_type": 0
+    },
+    {
+        "name": "arctic orangery",
+        "width": 7,
+        "height": 7,
+        "road_type": 1
+    },
+    {
+        "name": "Ascended Dreki Totem",
+        "width": 3,
+        "height": 3,
+        "road_type": 0
+    },
+    {
+        "name": "Chateau Frontenac",
+        "width": 5,
+        "height": 6,
+        "road_type": 1
+    },
+    {
+        "name": "eternal market - noble horizon",
+        "width": 6,
+        "height": 6,
+        "road_type": 0
+    },
+    {
+        "name": "neo globa fountain - lv2",
+        "width": 3,
+        "height": 3,
+        "road_type": 0
+    },
+    {
+        "name": "timeless dojo - lv4",
+        "width": 3,
+        "height": 3,
+        "road_type": 1
+    },
+    {
+        "name": "intelligence relay - lv2",
+        "width": 3,
+        "height": 2,
+        "road_type": 0
+    },
+    {
+        "name": "huginn tale hut - lv2",
+        "width": 4,
+        "height": 4,
+        "road_type": 1
+    },
+    {
+        "name": "shinto temple - lv4",
+        "width": 3,
+        "height": 4,
+        "road_type": 0
+    },
+    {
+        "name": "neo clocktower - lv2",
+        "width": 2,
+        "height": 3,
+        "road_type": 0
+    },
+    {
+        "name": "the blue galaxy",
+        "width": 7,
+        "height": 5,
+        "road_type": 1
     }
 ]

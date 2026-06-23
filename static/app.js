@@ -20,6 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const annealingIterInput = document.getElementById('annealing-iter');
     const optTimeInput = document.getElementById('opt-time');
     const townhallFixedCheckbox = document.getElementById('townhall-fixed');
+    const resumeWeightsCheckbox = document.getElementById('resume-weights');
+    const resumeWeightsContainer = document.getElementById('resume-weights-container');
 
     // Restore grid dimensions from localStorage
     const savedGridW = localStorage.getItem('foe_city_grid_w');
@@ -171,6 +173,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (savedFixed !== null) {
             townhallFixedCheckbox.checked = savedFixed === 'true';
         }
+        const savedResume = localStorage.getItem('foe_city_resume_weights');
+        if (savedResume !== null && resumeWeightsCheckbox) {
+            resumeWeightsCheckbox.checked = savedResume === 'true';
+        }
     }
 
     function saveToLocalStorage() {
@@ -197,6 +203,9 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('foe_city_annealing_iter', annealingIterInput.value);
             localStorage.setItem('foe_city_opt_time', optTimeInput.value);
             localStorage.setItem('foe_city_townhall_fixed', townhallFixedCheckbox.checked);
+            if (resumeWeightsCheckbox) {
+                localStorage.setItem('foe_city_resume_weights', resumeWeightsCheckbox.checked);
+            }
         }
     }
 
@@ -206,6 +215,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         backboneParams.style.display = (solver === 'backbone' || solver === 'constraint_programming' || solver === 'simulated_annealing' || solver === 'evolutionary' || solver === 'user_heuristic' || solver === 'neural_network') ? 'flex' : 'none';
         annealingParams.style.display = solver === 'simulated_annealing' ? 'flex' : 'none';
+        
+        if (resumeWeightsContainer) {
+            resumeWeightsContainer.style.display = solver === 'neural_network' ? 'flex' : 'none';
+        }
         
         const roadTypeContainer = document.getElementById('paint-road-type-container');
         if (roadTypeContainer) {
@@ -239,6 +252,9 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshGridVisuals();
             saveToLocalStorage();
         });
+        if (resumeWeightsCheckbox) {
+            resumeWeightsCheckbox.addEventListener('change', saveToLocalStorage);
+        }
         
         // Initial trigger
         updateSolverParamsVisibility();
@@ -967,7 +983,8 @@ document.addEventListener('DOMContentLoaded', () => {
             solver_type: solverSelect.value,
             backbone_type: backboneSelect.value,
             annealing_iterations: parseInt(annealingIterInput.value) || 1500,
-            custom_roads: customRoads
+            custom_roads: customRoads,
+            resume_weights: resumeWeightsCheckbox ? resumeWeightsCheckbox.checked : false
         };
         
         btnOptimize.textContent = "Solving...";

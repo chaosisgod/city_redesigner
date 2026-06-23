@@ -41,6 +41,7 @@ class SolveRequest(BaseModel):
     backbone_type: Optional[str] = "center_spine"  # center_spine, grid, perimeter, custom
     annealing_iterations: int = 1500
     custom_roads: Optional[List[PlacedRoad]] = None
+    resume_weights: bool = False
 
 class SolveResponse(BaseModel):
     placed_buildings: List[PlacedBuilding]
