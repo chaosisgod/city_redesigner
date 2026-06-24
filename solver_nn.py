@@ -335,11 +335,27 @@ def run_constructive_placement(network, request):
         if b.road_type > 0:
             queue = []
             req_road_type = b.road_type
+            
+            # 1. Existing road tiles (type 1 or 2) meeting the requirement are sources (distance 0)
             for y in range(grid_h):
                 for x in range(grid_w):
-                    if current_roads[y][x] >= req_road_type:
-                        dist_grid[y][x] = 0
-                        queue.append((x, y))
+                    if current_roads[y][x] == 1 or current_roads[y][x] == 2:
+                        if current_roads[y][x] >= req_road_type:
+                            dist_grid[y][x] = 0
+                            queue.append((x, y))
+                            
+            # 2. Empty tiles adjacent to the Townhall (type 3) are sources (distance 1)
+            # This ensures that a real road tile (type 1 or 2) is always placed to connect to the Townhall.
+            for y in range(grid_h):
+                for x in range(grid_w):
+                    if current_roads[y][x] == 3: # Townhall tile
+                        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                            nx, ny = x + dx, y + dy
+                            if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                                if not occupied[ny][nx] and current_roads[ny][nx] == 0:
+                                    if dist_grid[ny][nx] == float('inf'):
+                                        dist_grid[ny][nx] = 1
+                                        queue.append((nx, ny))
                         
             head = 0
             while head < len(queue):
