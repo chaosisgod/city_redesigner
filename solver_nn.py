@@ -495,11 +495,14 @@ def run_constructive_placement(network, request):
     )
     return response
 
-def solve_layout(request: SolveRequest) -> SolveResponse:
+def solve_single_worker(request: SolveRequest, seed: int) -> tuple:
     import json
+    import random
+    np.random.seed(seed)
+    random.seed(seed)
+    
     # Setup neuro-evolution parameters
     pop_size = 20
-    generations = 30
     mutation_rate = 0.2
     mutation_scale = 0.15
     elitism = 4
@@ -600,17 +603,70 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
             
         population = new_population
 
-    # Save the best network checkpoint weights at the end of the run
+    best_weights_serialized = None
     if best_network is not None:
         try:
             weights = best_network.get_weights()
-            serialized = [w.tolist() for w in weights]
+            best_weights_serialized = [w.tolist() for w in weights]
+        except Exception as e:
+            print(f"Error serializing best network weights: {e}")
+
+    return best_response, best_weights_serialized
+
+def solve_layout(request: SolveRequest) -> SolveResponse:
+    import random
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+
+    num_workers = max(1, (os.cpu_count() or 4) - 1)
+    
+    # If single-process or debug, execute directly
+    if request.optimization_time <= 0.1 or num_workers <= 1 or request.debug:
+        res, weights_serialized = solve_single_worker(request, random.randint(0, 1000000))
+        if weights_serialized is not None:
+            try:
+                import json
+                with open("best_nn_weights.json", "w") as f:
+                    json.dump(weights_serialized, f)
+                print("Successfully saved best neural network weights checkpoint to best_nn_weights.json")
+            except Exception as e:
+                print(f"Error saving best_nn_weights.json: {e}")
+        return res
+
+    best_response = None
+    best_score = -float('inf')
+    best_weights_serialized = None
+    
+    seeds = [random.randint(0, 1000000) for _ in range(num_workers)]
+    ctx = multiprocessing.get_context('spawn')
+    
+    with ProcessPoolExecutor(max_workers=num_workers, mp_context=ctx) as executor:
+        futures = [executor.submit(solve_single_worker, request, seed) for seed in seeds]
+        for future in as_completed(futures):
+            if os.path.exists("abort.lock"):
+                for p in multiprocessing.active_children():
+                    try: p.terminate()
+                    except: pass
+                break
+            try:
+                res, weights_serialized = future.result()
+                if res and res.score > best_score:
+                    best_score = res.score
+                    best_response = res
+                    best_weights_serialized = weights_serialized
+            except Exception as e:
+                print(f"Neuro-evolutionary worker process failed: {e}")
+                
+    # Save the best weights found across all processes
+    if best_weights_serialized is not None:
+        try:
+            import json
             with open("best_nn_weights.json", "w") as f:
-                json.dump(serialized, f)
-            print("Successfully saved best neural network weights checkpoint to best_nn_weights.json")
+                json.dump(best_weights_serialized, f)
+            print("Successfully saved best neural network weights checkpoint from the best worker process to best_nn_weights.json")
         except Exception as e:
             print(f"Error saving best_nn_weights.json: {e}")
-
+            
     return best_response
 
 def tournament_select(indices, fitness_scores, k=3):
