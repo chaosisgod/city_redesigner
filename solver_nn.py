@@ -6,10 +6,17 @@ import os
 class PolicyNetwork:
     def __init__(self, weights=None):
         if weights is not None:
-            self.W1, self.b1, self.W2, self.b2, self.W3, self.b3 = weights
+            W1, b1, W2, b2, W3, b3 = weights
+            # Shape checks to support upgrading old 8-feature weights to 9-feature weights
+            if W1.shape == (8, 16):
+                new_W1 = np.random.randn(9, 16) * 0.1
+                new_W1[0:8, :] = W1
+                new_W1[8, 4] = 4.0 # Prior weight for road proximity feature
+                W1 = new_W1
+            self.W1, self.b1, self.W2, self.b2, self.W3, self.b3 = W1, b1, W2, b2, W3, b3
         else:
             # Gaussian initialization with a packing heuristic prior
-            self.W1 = np.random.randn(8, 16) * 0.1
+            self.W1 = np.random.randn(9, 16) * 0.1
             self.b1 = np.zeros(16)
             # Column 0: prefer close to townhall (dist_th is index 0)
             self.W1[0, 0] = -1.0
@@ -19,6 +26,8 @@ class PolicyNetwork:
             self.W1[2, 2] = -1.5
             # Column 3: prefer high occupancy ratio (occ_ratio is index 3)
             self.W1[3, 3] = 2.5
+            # Column 8: prefer high road proximity (road_proximity is index 8)
+            self.W1[8, 4] = 4.0
             
             self.W2 = np.random.randn(16, 8) * 0.1
             self.b2 = np.zeros(8)
@@ -27,6 +36,7 @@ class PolicyNetwork:
             self.W2[1, 0] = 1.0
             self.W2[2, 0] = 1.0
             self.W2[3, 0] = 1.5
+            self.W2[4, 0] = 2.5 # weight for hidden neuron 4
             
             self.W3 = np.random.randn(8, 1) * 0.1
             self.b3 = np.zeros(1)
@@ -34,7 +44,7 @@ class PolicyNetwork:
             
     def forward(self, X):
         # Vectorized forward pass for N candidate positions
-        # X shape: (N, 8)
+        # X shape: (N, 9)
         h1 = np.maximum(0, np.dot(X, self.W1) + self.b1)  # ReLU
         h2 = np.maximum(0, np.dot(h1, self.W2) + self.b2) # ReLU
         out = np.dot(h2, self.W3) + self.b3
@@ -309,6 +319,7 @@ def run_constructive_placement(network, request):
 
     # Initialize constructive placement occupied map using the generated init_occupied
     occupied = [row[:] for row in init_occupied]
+    current_roads = [row[:] for row in init_roads]
 
     # Place other buildings constructively
     # Sort buildings: first those requiring 2x2 roads, then 1x1 roads, then roadless. Within groups, sort by area descending.
@@ -316,8 +327,36 @@ def run_constructive_placement(network, request):
     
     placed_b_map = {}
     for b in other_buildings:
+        # Multi-source BFS to calculate road distance to all empty tiles
+        dist_grid = [[float('inf') for _ in range(grid_w)] for _ in range(grid_h)]
+        parent_grid = [[None for _ in range(grid_w)] for _ in range(grid_h)]
+        
+        # Only run BFS if the building requires a road
+        if b.road_type > 0:
+            queue = []
+            req_road_type = b.road_type
+            for y in range(grid_h):
+                for x in range(grid_w):
+                    if current_roads[y][x] >= req_road_type:
+                        dist_grid[y][x] = 0
+                        queue.append((x, y))
+                        
+            head = 0
+            while head < len(queue):
+                cx, cy = queue[head]
+                head += 1
+                curr_dist = dist_grid[cy][cx]
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nx, ny = cx + dx, cy + dy
+                    if 0 <= nx < grid_w and 0 <= ny < grid_h:
+                        if not occupied[ny][nx] and dist_grid[ny][nx] == float('inf'):
+                            dist_grid[ny][nx] = curr_dist + 1
+                            parent_grid[ny][nx] = (cx, cy)
+                            queue.append((nx, ny))
+
         candidates = []
         features_list = []
+        road_connect_info = [] # Store (min_dist, best_boundary_tile) for each candidate
         
         # Scan grid for valid placement candidates
         for y in range(grid_h - b.height + 1):
@@ -328,10 +367,51 @@ def run_constructive_placement(network, request):
                     if any(occupied[y+dy][x : x + b.width]):
                         fits = False
                         break
-                
+                        
                 if fits:
+                    # Calculate road connection feature
+                    if b.road_type == 0:
+                        road_proximity = 1.0
+                        best_boundary = None
+                        min_dist = 0
+                    else:
+                        # Find minimum distance to road network from building boundary
+                        min_dist = float('inf')
+                        best_boundary = None
+                        
+                        # Boundary check
+                        # Top / Bottom
+                        for dx in range(b.width):
+                            for ty, tx in [(y - 1, x + dx), (y + b.height, x + dx)]:
+                                if 0 <= tx < grid_w and 0 <= ty < grid_h:
+                                    d = dist_grid[ty][tx]
+                                    if d < min_dist:
+                                        min_dist = d
+                                        best_boundary = (tx, ty)
+                        # Left / Right
+                        for dy in range(b.height):
+                            for ty, tx in [(y + dy, x - 1), (y + dy, x + b.width)]:
+                                if 0 <= tx < grid_w and 0 <= ty < grid_h:
+                                    d = dist_grid[ty][tx]
+                                    if d < min_dist:
+                                        min_dist = d
+                                        best_boundary = (tx, ty)
+                                        
+                        if min_dist != float('inf'):
+                            road_proximity = 1.0 / (1.0 + min_dist)
+                        else:
+                            road_proximity = 0.0
+                            
+                    # If the building requires a road, but cannot be connected, we should NOT place it here
+                    if b.road_type > 0 and road_proximity == 0.0:
+                        continue
+                        
                     candidates.append((x, y))
-                    features_list.append(get_features(x, y, b.width, b.height, b.road_type, hub_cx, hub_cy, grid_w, grid_h, occupied))
+                    road_connect_info.append((min_dist, best_boundary))
+                    
+                    feats = get_features(x, y, b.width, b.height, b.road_type, hub_cx, hub_cy, grid_w, grid_h, occupied)
+                    feats.append(road_proximity)
+                    features_list.append(feats)
                     
         if not candidates:
             # Cannot place building
@@ -341,120 +421,30 @@ def run_constructive_placement(network, request):
         scores = network.forward(np.array(features_list))
         best_idx = np.argmax(scores)
         best_x, best_y = candidates[best_idx]
+        best_min_dist, best_boundary = road_connect_info[best_idx]
         
         # Mark occupied
         placed_b_map[b.id] = (best_x, best_y)
         for dy in range(b.height):
             for dx in range(b.width):
                 occupied[best_y+dy][best_x+dx] = True
-
-    # ------------------ BFS Road Routing and Scoring ------------------
-    # Re-initialize occupied matrix starting with init_occupied + placed buildings
-    eval_occupied = [row[:] for row in init_occupied]
-    final_placed_buildings = []
-    if hub:
-        final_placed_buildings.append(PlacedBuilding(building_id=hub.id, x=hub_x, y=hub_y))
-        
-    for b in other_buildings:
-        if b.id in placed_b_map:
-            bx, by = placed_b_map[b.id]
-            for dy in range(b.height):
-                for dx in range(b.width):
-                    eval_occupied[by+dy][bx+dx] = True
-            final_placed_buildings.append(PlacedBuilding(building_id=b.id, x=bx, y=by))
-
-    roads = [row[:] for row in init_roads]
-    
-    # Pathfinding routing helper
-    def find_shortest_road_path(start_tiles, req_type):
-        queue = []
-        visited = {}
-        for sx, sy in start_tiles:
-            if 0 <= sx < grid_w and 0 <= sy < grid_h:
-                if (sx, sy) not in hub_tiles:
-                    if not eval_occupied[sy][sx] or roads[sy][sx] > 0:
-                        queue.append((sx, sy, 0))
-                        visited[(sx, sy)] = None
-                        
-        head = 0
-        found_dest = None
-        while head < len(queue):
-            cx, cy, dist = queue[head]
-            head += 1
-            
-            if roads[cy][cx] >= req_type:
-                found_dest = (cx, cy)
-                break
                 
-            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                nx, ny = cx + dx, cy + dy
-                if 0 <= nx < grid_w and 0 <= ny < grid_h:
-                    if (nx, ny) not in visited:
-                        if not eval_occupied[ny][nx] or roads[ny][nx] > 0:
-                            visited[(nx, ny)] = (cx, cy)
-                            queue.append((nx, ny, dist + 1))
-                            
-        if found_dest:
-            path = []
-            curr = found_dest
+        # Draw road path if needed
+        if b.road_type > 0 and best_boundary is not None and best_min_dist > 0:
+            curr = best_boundary
             while curr is not None:
-                path.append(curr)
-                curr = visited[curr]
-            return path[::-1]
-        return None
+                cx, cy = curr
+                current_roads[cy][cx] = max(current_roads[cy][cx], b.road_type)
+                occupied[cy][cx] = True
+                curr = parent_grid[cy][cx]
 
     connected_placed_buildings = []
     if hub:
         connected_placed_buildings.append(PlacedBuilding(building_id=hub.id, x=hub_x, y=hub_y))
-        
-    for pb in final_placed_buildings:
-        if hub and pb.building_id == hub.id: continue
-        b = next(x for x in other_buildings if x.id == pb.building_id)
-        if b.road_type == 0:
-            connected_placed_buildings.append(pb)
-            continue
-            
-        boundary = set()
-        for dx in range(b.width):
-            boundary.add((pb.x + dx, pb.y - 1))
-            boundary.add((pb.x + dx, pb.y + b.height))
-        for dy in range(b.height):
-            boundary.add((pb.x - 1, pb.y + dy))
-            boundary.add((pb.x + b.width, pb.y + dy))
-            
-        path = find_shortest_road_path(boundary, b.road_type)
-        if path:
-            for rx, ry in path:
-                roads[ry][rx] = max(roads[ry][rx], b.road_type)
-                eval_occupied[ry][rx] = True
-            connected_placed_buildings.append(pb)
+    for b_id, pos in placed_b_map.items():
+        bx, by = pos
+        connected_placed_buildings.append(PlacedBuilding(building_id=b_id, x=bx, y=by))
 
-    # Post-routing BFS road pruning: retain only roads connecting a placed building back to the hub
-    keep_tiles = set()
-    prune_queue = []
-    prune_visited = {}
-    if hub:
-        for th_tx, th_ty in hub_tiles:
-            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                nx, ny = th_tx + dx, th_ty + dy
-                if 0 <= nx < grid_w and 0 <= ny < grid_h:
-                    if roads[ny][nx] > 0 and (nx, ny) not in prune_visited:
-                        prune_visited[(nx, ny)] = None
-                        prune_queue.append((nx, ny))
-                        
-    head = 0
-    while head < len(prune_queue):
-        cx, cy = prune_queue[head]
-        head += 1
-        keep_tiles.add((cx, cy))
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            nx, ny = cx + dx, cy + dy
-            if 0 <= nx < grid_w and 0 <= ny < grid_h:
-                if roads[ny][nx] > 0 and (nx, ny) not in prune_visited:
-                    prune_visited[(nx, ny)] = None
-                    prune_queue.append((nx, ny))
-
-    # Remove pruned roads
     final_placed_roads = []
     num_1x1 = 0
     num_2x2_tiles = 0
@@ -463,19 +453,15 @@ def run_constructive_placement(network, request):
     placed_2x2_tiles = set()
     for y in range(grid_h):
         for x in range(grid_w):
-            if (x, y) not in keep_tiles:
-                roads[y][x] = 0
-            else:
-                if roads[y][x] == 2:
-                    # Place 2x2 road anchor on bottom-leftmost tile of any 2x2 block
+            if (x, y) not in hub_tiles:
+                if current_roads[y][x] == 2:
                     if (x, y) not in placed_2x2_tiles:
                         final_placed_roads.append(PlacedRoad(x=x, y=y, type=2))
-                        # mark entire 2x2 road grid covered
                         for rdy in range(2):
                             for rdx in range(2):
                                 placed_2x2_tiles.add((x + rdx, y + rdy))
                         num_2x2_tiles += 1
-                elif roads[y][x] == 1:
+                elif current_roads[y][x] == 1:
                     final_placed_roads.append(PlacedRoad(x=x, y=y, type=1))
                     num_1x1 += 1
 
