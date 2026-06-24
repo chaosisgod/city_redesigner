@@ -53,17 +53,27 @@ def get_features(x, y, w, h, road_type, th_cx, th_cy, grid_w, grid_h, occupied):
     
     # 3. Local occupancy density in a padded window around candidate
     occ_count = 0
-    total_count = 0
-    for dy in range(-1, h + 1):
-        for dx in range(-1, w + 1):
-            nx, ny = x + dx, y + dy
-            if 0 <= nx < grid_w and 0 <= ny < grid_h:
-                if occupied[ny][nx]:
-                    occ_count += 1
+    total_count = (w + 2) * (h + 2)
+    
+    # Fast path if candidate is fully inside the grid boundary (90%+ of cases)
+    if x > 0 and y > 0 and x + w < grid_w and y + h < grid_h:
+        occ_count = sum(sum(occupied[dy][x - 1 : x + w + 1]) for dy in range(y - 1, y + h + 1))
+    else:
+        for dy in range(-1, h + 1):
+            ny = y + dy
+            if 0 <= ny < grid_h:
+                row = occupied[ny]
+                for dx in range(-1, w + 1):
+                    nx = x + dx
+                    if 0 <= nx < grid_w:
+                        if row[nx]:
+                            occ_count += 1
+                    else:
+                        occ_count += 1
             else:
-                occ_count += 1  # borders count as occupied to encourage internal packing
-            total_count += 1
-    occ_ratio = occ_count / float(total_count) if total_count > 0 else 0.0
+                occ_count += (w + 2)
+                
+    occ_ratio = occ_count / float(total_count)
     
     # 4. Road connection necessity
     is_road_need = road_type / 2.0
@@ -315,11 +325,9 @@ def run_constructive_placement(network, request):
                 # Simple check if fits
                 fits = True
                 for dy in range(b.height):
-                    for dx in range(b.width):
-                        if occupied[y+dy][x+dx]:
-                            fits = False
-                            break
-                    if not fits: break
+                    if any(occupied[y+dy][x : x + b.width]):
+                        fits = False
+                        break
                 
                 if fits:
                     candidates.append((x, y))
@@ -526,12 +534,12 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
     patience = 8
     
     end_time = time.time() + request.optimization_time
+    generation = 0
     
-    for gen in range(generations):
-        if time.time() >= end_time:
-            break
+    while time.time() < end_time:
         if os.path.exists("abort.lock"):
             break
+        generation += 1
             
         fitness_scores = []
         layouts = []
@@ -560,7 +568,7 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
             stagnant_generations += 1
             
         if request.early_stopping and stagnant_generations >= patience:
-            print(f"Early stopping triggered: fitness stagnant for {stagnant_generations} generations.")
+            print(f"Early stopping triggered: fitness stagnant for {stagnant_generations} generations (at generation {generation}).")
             break
             
         # Form new population (Elitism + Selection + Mutation)

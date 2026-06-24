@@ -1067,7 +1067,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Globally check building placement count
             if (data.placed_buildings.length < buildings.length) {
-                showStatus(`Optimization Failed: Only ${data.placed_buildings.length} out of ${buildings.length} buildings are placed on the map.`, "error");
+                showStatus(`Optimization Finished (Partial Layout): Placed ${data.placed_buildings.length} out of ${buildings.length} buildings. Unplaced buildings are in the dock.`, "warning", 8000);
             } else {
                 showStatus(`Optimization Succeeded: All ${buildings.length} buildings are successfully placed and connected!`, "success", 8000);
             }
