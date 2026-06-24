@@ -567,7 +567,10 @@ def solve_layout(request: SolveRequest) -> SolveResponse:
         else:
             stagnant_generations += 1
             
-        if request.early_stopping and stagnant_generations >= patience:
+        placed_set = {pb.building_id for pb in best_response.placed_buildings} if best_response else set()
+        best_unplaced = len(request.buildings) - len(placed_set)
+        
+        if request.early_stopping and stagnant_generations >= patience and best_unplaced == 0:
             print(f"Early stopping triggered: fitness stagnant for {stagnant_generations} generations (at generation {generation}).")
             break
             

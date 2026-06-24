@@ -442,8 +442,11 @@ def solve_single_worker(request: SolveRequest, seed: int) -> SolveResponse:
         else:
             stagnant_generations += 1
             
-        if request.early_stopping and stagnant_generations >= patience:
-            print(f"Early stopping triggered: fitness stagnant for {stagnant_generations} generations.")
+        placed_count = len(best_overall[2]) if best_overall else 0
+        best_unplaced = len(request.buildings) - placed_count
+        
+        if request.early_stopping and stagnant_generations >= patience and best_unplaced == 0:
+            print(f"Early stopping triggered: fitness stagnant for {stagnant_generations} generations (at generation {generation}).")
             break
             
         next_population = []
