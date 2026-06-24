@@ -1045,12 +1045,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const num1x1 = data.num_1x1_roads || 0;
+            const num2x2 = data.num_2x2_roads || 0;
+            const roadCost = num1x1 + num2x2 * 4;
+
             // Populate human-readable summary stats
             const summaryDiv = document.getElementById('solver-summary-stats');
             if (summaryDiv) {
-                const num1x1 = data.num_1x1_roads || 0;
-                const num2x2 = data.num_2x2_roads || 0;
-                const roadCost = num1x1 + num2x2 * 4;
                 summaryDiv.innerHTML = `
                     <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 4px; padding: 8px;">
                         <strong>Placed Buildings:</strong> ${data.placed_buildings.length} / ${buildings.length}<br>
@@ -1067,9 +1068,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Globally check building placement count
             if (data.placed_buildings.length < buildings.length) {
-                showStatus(`Optimization Finished (Partial Layout): Placed ${data.placed_buildings.length} out of ${buildings.length} buildings. Unplaced buildings are in the dock.`, "warning", 8000);
+                showStatus(`Optimization Finished (Partial Layout): Placed ${data.placed_buildings.length} out of ${buildings.length} buildings. Unplaced buildings are in the dock. (Roads used: ${roadCost} tiles)`, "warning", 8000);
             } else {
-                showStatus(`Optimization Succeeded: All ${buildings.length} buildings are successfully placed and connected!`, "success", 8000);
+                showStatus(`Optimization Succeeded: All ${buildings.length} buildings are successfully placed and connected! (Roads used: ${roadCost} tiles)`, "success", 8000);
             }
         } catch (e) {
             console.error(e);
